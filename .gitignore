@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+.ruff_cache/
+node_modules/
+.next/
+*.tfstate*
+.terraform/
+.claude/settings.local.json
