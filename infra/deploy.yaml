@@ -1,0 +1,12 @@
+# Deployed by CI on merge to main. Staging first, production after the smoke test passes.
+app: parcelwise-api
+primary_region: sjc
+
+services:
+  api:
+    command: gunicorn app.api.wsgi:app --workers 4 --timeout 30
+    instances: 2
+    memory: 1024mb
+    healthcheck: /healthz
+
+release_command: python -m scripts.migrate
