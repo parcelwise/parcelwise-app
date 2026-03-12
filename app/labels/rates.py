@@ -1,0 +1,21 @@
+"""Rate quotes. A quote is only good for ten minutes; carriers reprice after that."""
+
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
+RATE_TTL = timedelta(minutes=10)
+
+
+@dataclass(frozen=True)
+class Rate:
+    carrier: str
+    service: str
+    price: Decimal
+    quoted_at: datetime
+    rate_id: str = ""
+
+
+def quote_is_fresh(rate: Rate, *, now: datetime | None = None) -> bool:
+    now = now or datetime.now(timezone.utc)
+    return now - rate.quoted_at < RATE_TTL
