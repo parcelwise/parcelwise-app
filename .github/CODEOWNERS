@@ -1,0 +1,9 @@
+# Each path's owners review changes to it. Keep this in step with docs/architecture.md.
+*                       @parcelwise/platform
+/app/labels/            @parcelwise/labels
+/app/orders/            @parcelwise/labels @parcelwise/dashboard
+/app/shopify/           @parcelwise/integrations
+/app/billing/           @parcelwise/revenue @parcelwise/platform
+/web/                   @parcelwise/dashboard
+/infra/                 @parcelwise/platform
+/migrations/            @parcelwise/platform
