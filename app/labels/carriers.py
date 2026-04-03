@@ -49,3 +49,22 @@ class USPS:
             headers={"Idempotency-Key": idempotency_key},
         )
         return PurchaseResult(response["trackingNumber"], response["labelUrl"])
+
+
+@register("ups")
+class UPS:
+    base_url = "https://onlinetools.ups.com/api/shipments/v2403"
+
+    def __init__(self, account):
+        self.account = account
+
+    def buy(self, order, rate, *, idempotency_key: str) -> PurchaseResult:
+        response = self.account.post(
+            f"{self.base_url}/ship",
+            json={
+                "ShipmentRequest": {"Shipment": {"Service": {"Code": rate.service}}, "ReferenceNumber": order.id},
+            },
+            headers={"transId": idempotency_key},
+        )
+        shipment = response["ShipmentResponse"]["ShipmentResults"]
+        return PurchaseResult(shipment["ShipmentIdentificationNumber"], shipment["LabelURL"])
