@@ -19,3 +19,11 @@ class Rate:
 def quote_is_fresh(rate: Rate, *, now: datetime | None = None) -> bool:
     now = now or datetime.now(timezone.utc)
     return now - rate.quoted_at < RATE_TTL
+
+
+def cheapest(rates: list[Rate]) -> Rate:
+    """The cheapest fresh rate. Ties go to the faster service, which carriers list first."""
+    fresh = [r for r in rates if quote_is_fresh(r)]
+    if not fresh:
+        raise LookupError("no fresh rates")
+    return min(fresh, key=lambda r: r.price)
