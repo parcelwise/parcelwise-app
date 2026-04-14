@@ -3,6 +3,8 @@
 Shipping labels for Shopify shops. Merchants connect their store, see every unfulfilled order with a live
 rate, and buy USPS or UPS labels in a click.
 
+See [docs/architecture.md](docs/architecture.md) for how the pieces fit.
+
 ## Layout
 
 | Path | What lives there |
