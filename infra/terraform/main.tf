@@ -17,3 +17,12 @@ module "db" {
 resource "aws_s3_bucket" "labels" {
   bucket = "parcelwise-labels-prod"
 }
+
+resource "aws_s3_bucket_lifecycle_configuration" "labels" {
+  bucket = aws_s3_bucket.labels.id
+  rule {
+    id     = "expire-pdfs"
+    status = "Enabled"
+    expiration { days = 90 }
+  }
+}
