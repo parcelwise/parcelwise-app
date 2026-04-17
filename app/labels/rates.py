@@ -27,3 +27,12 @@ def cheapest(rates: list[Rate]) -> Rate:
     if not fresh:
         raise LookupError("no fresh rates")
     return min(fresh, key=lambda r: r.price)
+
+
+DIM_DIVISOR = {"fedex": 139, "ups": 139, "usps": 166}
+
+
+def billable_weight_oz(weight_oz: float, dims_in: tuple[float, float, float], carrier: str) -> float:
+    length, width, height = dims_in
+    dim_lb = (length * width * height) / DIM_DIVISOR[carrier]
+    return max(weight_oz, dim_lb * 16)
