@@ -12,4 +12,5 @@ class Order:
     sku: str
     quantity: int
     weight_oz: float
+    dims_in: tuple[float, float, float] = (0.0, 0.0, 0.0)
     created_at: datetime | None = None

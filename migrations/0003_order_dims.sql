@@ -1,0 +1,1 @@
+ALTER TABLE orders ADD COLUMN dims_in NUMERIC(6, 2)[] NOT NULL DEFAULT '{0,0,0}';
