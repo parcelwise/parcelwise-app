@@ -14,6 +14,7 @@ class Settings:
     database_url: str = field(default_factory=lambda: _env("DATABASE_URL", "postgresql://localhost/parcelwise"))
     redis_url: str = field(default_factory=lambda: _env("REDIS_URL", "redis://localhost:6379/0"))
     shopify_api_version: str = "2026-07"
+    assistant_enabled: bool = field(default_factory=lambda: _env("PARCELWISE_ASSISTANT", "off") == "on")
 
     sentry_dsn: str = field(default_factory=lambda: _env("SENTRY_DSN"))
     release: str = field(default_factory=lambda: _env("GIT_SHA", "local"))

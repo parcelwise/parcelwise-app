@@ -12,6 +12,7 @@ See [docs/architecture.md](docs/architecture.md) for how the pieces fit.
 | `app/labels/` | Rate quotes, label purchases, voids and PDFs |
 | `app/orders/` | Orders synced from Shopify |
 | `app/shopify/` | Shopify sync and webhooks |
+| `app/assistant/` | The Parcelwise Assistant |
 | `app/billing/` | Plans and Stripe |
 | `web/` | The merchant dashboard (Next.js) |
 | `infra/` | Deploy config and Terraform |

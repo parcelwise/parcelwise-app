@@ -7,4 +7,5 @@ ROUTES = {
     ("POST", "/webhooks/stripe"): "app.billing.stripe_webhooks:handle_event",
     ("POST", "/webhooks/shopify"): "app.shopify.webhooks:verify",
     ("GET", "/api/orders/search"): "app.orders.queries:search_orders",
+    ("POST", "/api/assistant/ask"): "app.assistant.chat:ask",
 }
