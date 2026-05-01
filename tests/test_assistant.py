@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 import pytest
 
-from app.assistant import chat
 from app.assistant.chat import AssistantUnavailable, ModelTimeout, ask
 
 
@@ -23,22 +22,17 @@ class FakeMerchant:
     plan: str = "starter"
 
 
-@pytest.fixture
-def on(monkeypatch):
-    monkeypatch.setattr(chat, "available", lambda merchant: True)
-
-
-def test_answer_completes(on):
+def test_answer_completes():
     answer = ask(FakeMerchant(), "What's waiting?", FakeModel())
     assert answer.completed and answer.text.startswith("Two orders")
     assert answer.request_id
 
 
-def test_timeout_is_recorded_not_raised(on):
+def test_timeout_is_recorded_not_raised():
     answer = ask(FakeMerchant(), "What's waiting?", FakeModel(fail=ModelTimeout()))
     assert answer.status == "timed_out" and not answer.completed
 
 
-def test_off_by_default():
+def test_free_plan_has_no_assistant():
     with pytest.raises(AssistantUnavailable):
-        ask(FakeMerchant(), "Hello?", FakeModel())
+        ask(FakeMerchant(plan="free"), "Hello?", FakeModel())

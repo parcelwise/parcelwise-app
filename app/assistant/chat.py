@@ -1,7 +1,7 @@
 """The Parcelwise Assistant: a merchant asks about their orders, labels or plan and gets one answer.
 
 One question in, one answer out. `status` says whether the answer finished. The model sits behind
-`ModelClient` so tests never call one. Off for everyone unless PARCELWISE_ASSISTANT=on.
+`ModelClient` so tests never call one. Starter and Growth have it; Free does not (app/billing/plans.py).
 """
 
 import uuid
@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Protocol
 
-from app.core.config import settings
+from app.billing.plans import has_assistant
 
 
 class ModelClient(Protocol):
@@ -39,7 +39,7 @@ class Answer:
 
 
 def available(merchant) -> bool:
-    return settings.assistant_enabled
+    return has_assistant(merchant.plan)
 
 
 def ask(merchant, question: str, model: ModelClient, *, request_id: str = "", context: dict | None = None) -> Answer:
