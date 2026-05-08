@@ -28,3 +28,17 @@ export const buyLabel = (orderId: string, rateId: string, shownPrice: string) =>
   });
 
 export const searchOrders = (q: string) => call<Order[]>(`/orders/search?q=${encodeURIComponent(q)}`);
+
+export type AssistantAnswer = {
+  requestId: string;
+  question: string;
+  text: string;
+  status: "completed" | "failed" | "timed_out";
+};
+
+export const askAssistant = (question: string) =>
+  call<AssistantAnswer>("/assistant/ask", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
