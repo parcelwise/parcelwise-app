@@ -2,6 +2,8 @@
 
 PLANS = {
     "free": {"labels_per_month": 50},
+    "starter": {"labels_per_month": 1_000},
+    "growth": {"labels_per_month": None},
 }
 
 
