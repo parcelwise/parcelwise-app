@@ -24,3 +24,7 @@ make setup      # virtualenv, dependencies, local Postgres
 make test       # unit tests
 make dev        # API on :8000, dashboard on :3000
 ```
+
+## Deploys
+
+Merges to `main` deploy automatically. See [docs/runbooks/deploys.md](docs/runbooks/deploys.md).
