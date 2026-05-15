@@ -14,3 +14,9 @@ class Order:
     weight_oz: float
     dims_in: tuple[float, float, float] = (0.0, 0.0, 0.0)
     created_at: datetime | None = None
+    status: str = "unfulfilled"
+    tags: list[str] = field(default_factory=list)
+
+    @property
+    def fulfilled(self) -> bool:
+        return self.status == "fulfilled"

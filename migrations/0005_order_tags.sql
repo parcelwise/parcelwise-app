@@ -1,0 +1,1 @@
+ALTER TABLE orders ADD COLUMN tags TEXT[] NOT NULL DEFAULT '{}';
