@@ -23,4 +23,5 @@ def purchase_label(order, rate, *, idempotency_key: str, shown_price: Decimal) -
     `shown_price` is the price the merchant saw and approved.
     """
     carrier = get_carrier(rate.carrier, order.merchant)
+    result = with_one_retry(lambda: carrier.buy(order, rate, idempotency_key=idempotency_key))
     return Label(order.id, rate.carrier, result.tracking, rate.price, result.pdf_url)

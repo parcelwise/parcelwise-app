@@ -68,3 +68,13 @@ class UPS:
         )
         shipment = response["ShipmentResponse"]["ShipmentResults"]
         return PurchaseResult(shipment["ShipmentIdentificationNumber"], shipment["LabelURL"])
+
+
+def with_one_retry(call):
+    """Carriers time out under load. One retry with the same idempotency key is safe; more is not."""
+    try:
+        return call()
+    except CarrierError as error:
+        if not error.retryable:
+            raise
+        return call()
