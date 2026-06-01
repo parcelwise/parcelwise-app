@@ -7,7 +7,7 @@ daily counts (app/usage/daily.py, from #96). Platform data for Parcelwise is Lab
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-FEATURES = {"labels"}
+FEATURES = {"labels", "assistant"}
 
 
 @dataclass(frozen=True)

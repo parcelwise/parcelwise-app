@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Protocol
 
 from app.billing.plans import has_assistant
+from app.usage.events import UsageEvent, record
 
 
 class ModelClient(Protocol):
@@ -42,8 +43,9 @@ def available(merchant) -> bool:
     return has_assistant(merchant.plan)
 
 
-def ask(merchant, question: str, model: ModelClient, *, request_id: str = "", context: dict | None = None) -> Answer:
-    """Answer one question for one merchant."""
+def ask(merchant, question: str, model: ModelClient, *, request_id: str = "", context: dict | None = None,
+        usage=None) -> Answer:
+    """Answer one question for one merchant. A completed answer is one usage event (`assistant`)."""
     if not available(merchant):
         raise AssistantUnavailable(merchant.id)
     answer = Answer(merchant.id, request_id or uuid.uuid4().hex, question)
@@ -54,4 +56,6 @@ def ask(merchant, question: str, model: ModelClient, *, request_id: str = "", co
         answer.status = "timed_out"
     except Exception:
         answer.status = "failed"
+    if usage is not None and answer.completed:
+        record(usage, UsageEvent(merchant.id, "assistant", answer.request_id, at=answer.asked_at))
     return answer
