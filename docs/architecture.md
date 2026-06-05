@@ -28,3 +28,4 @@ Shopify ──webhooks──▶ app/shopify ──▶ orders (Postgres) ──�
 
 - Money is `Decimal`, never `float`.
 - Every label purchase goes through `purchase_label()` (see [ADR 0002](adr/0002-carrier-clients-behind-a-registry.md)).
+- A merchant sees the price before we buy ([ADR 0003](adr/0003-merchant-sees-the-price-first.md)).

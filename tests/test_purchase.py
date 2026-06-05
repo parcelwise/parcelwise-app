@@ -11,3 +11,7 @@ def test_purchase_uses_idempotency_key(monkeypatch, fresh_rate):
     label = purchase_label(FakeOrder("o1"), fresh_rate, idempotency_key="o1:1", shown_price=Decimal("5.40"))
     assert fake.bought == ["o1:1"]
     assert label.tracking_number == "TRK0001"
+
+
+def test_stale_rate_is_refused():
+    pass  # TODO(jordan): build a stale Rate and assert StaleRateError

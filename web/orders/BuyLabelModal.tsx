@@ -15,6 +15,7 @@ export function BuyLabelModal({ order, quote, onDone }: { order: Order; quote: Q
       await buyLabel(order.id, quote.rateId, quote.price);
       onDone();
     } catch (e) {
+      // 409 means the rate went stale or changed; show the new price instead of retrying.
       setError(String(e));
     } finally {
       setBusy(false);
