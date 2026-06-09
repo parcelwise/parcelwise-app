@@ -12,5 +12,9 @@ services:
     env:
       DATABASE_POOL_SIZE: "10"
       STATEMENT_TIMEOUT_MS: "5000"
+  usage-rollup:
+    command: python -m app.usage.rollup
+    schedule: "0 8 * * *"
+    instances: 1
 
 release_command: python -m scripts.migrate
