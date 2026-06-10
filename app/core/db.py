@@ -18,3 +18,10 @@ def transaction():
             yield conn
     finally:
         _pool.putconn(conn)
+
+
+STATEMENT_TIMEOUT_MS = 5_000
+
+
+def set_statement_timeout(conn, ms: int = STATEMENT_TIMEOUT_MS):
+    conn.execute(f"SET LOCAL statement_timeout = {int(ms)}")
