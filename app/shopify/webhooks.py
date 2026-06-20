@@ -11,3 +11,4 @@ def verify(body: bytes, header_hmac: str, secret: str) -> bool:
 
 
 TOPICS = {"orders/create", "orders/cancelled"}
+TOPICS = TOPICS | {"orders/fulfilled"}
