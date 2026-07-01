@@ -16,5 +16,9 @@ services:
     command: python -m app.usage.rollup
     schedule: "0 8 * * *"
     instances: 1
+  nightly-billing:
+    command: python -m app.billing.nightly
+    schedule: "0 9 * * *"
+    instances: 1
 
 release_command: python -m scripts.migrate
