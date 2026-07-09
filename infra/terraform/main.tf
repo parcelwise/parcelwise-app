@@ -12,6 +12,7 @@ module "db" {
   name           = "parcelwise-prod"
   instance_class = "db.t4g.medium"
   storage_gb     = 100
+  backup_retention_days = 14
 }
 
 resource "aws_s3_bucket" "labels" {
