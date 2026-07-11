@@ -8,6 +8,9 @@ type Props = {
 
 // One row per unfulfilled order. Labels are bought one order at a time from the row's button.
 export function OrdersTable({ orders, onBuyLabel }: Props) {
+  if (orders.length === 0) {
+    return <p className="empty">No unfulfilled orders. New Shopify orders show up here within a minute.</p>;
+  }
   return (
     <table className="orders">
       <thead>
