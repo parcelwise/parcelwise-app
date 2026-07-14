@@ -3,9 +3,13 @@ invoice item on the next invoice (ADR 0006). Nothing charges at purchase time.
 
 Not a Stripe metered price: usage records on a metered price cannot be taken back when a label is voided
 within 24 hours, and an invoice item posted when the period closes is computed net of voids.
+
+An invoice carries one line per feature per billing period (#124): several charges for the same feature
+in the same period fold into one. Per-label detail is the usage page's job, not the invoice's.
 """
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
 FEATURE_LABEL = {"labels": "Extra labels"}
@@ -25,7 +29,9 @@ class Charge:
 
     @property
     def description(self) -> str:
-        return f"{FEATURE_LABEL.get(self.feature, self.feature)}, {self.period}"
+        """One line per feature per period: the feature, the period, the quantity and the unit price (#124)."""
+        month = date.fromisoformat(self.period + "-01").strftime("%B %Y")
+        return f"{FEATURE_LABEL.get(self.feature, self.feature)}, {month}: {self.quantity} × ${self.unit_price}"
 
 
 def post_charge(stripe, customer_id: str, charge: Charge) -> str:
