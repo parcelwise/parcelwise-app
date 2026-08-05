@@ -3,6 +3,9 @@
 For the billing period that closed, for each metered feature: walk usage_daily by cursor, total per merchant,
 take the plan's allowance off, and post one charge per merchant and feature. Nothing charges at purchase time.
 A new metered feature is a plan entry and a usage feature, not a code path of its own here.
+
+Every charge is idempotent (ADR 0007), so the job can be re-run for a period. It runs on the first of the month
+for the month that just closed, and again every night after that for anything a failed batch left behind.
 """
 
 from datetime import date
@@ -38,11 +41,12 @@ def closed_period(today: date) -> str:
     return first.replace(month=first.month - 1).strftime("%Y-%m")
 
 
-def run(usage, plan_of: dict[str, str], customer_of: dict[str, str], stripe, *, period: str) -> int:
-    """Post the period's charges. Returns how many were posted."""
+def run(usage, plan_of: dict[str, str], customer_of: dict[str, str], stripe, posted, *, period: str) -> int:
+    """Post the period's charges that are not posted yet. Returns how many were posted this run."""
     totals = period_totals(usage, period, features=METERED)
-    posted = 0
-    for charge in charges_for(period, totals, plan_of):
-        post_charge(stripe, customer_of[charge.merchant_id], charge)
-        posted += 1
-    return posted
+    count = 0
+    with posted.transaction():
+        for charge in charges_for(period, totals, plan_of):
+            if post_charge(stripe, posted, customer_of[charge.merchant_id], charge):
+                count += 1
+    return count

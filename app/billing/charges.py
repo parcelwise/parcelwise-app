@@ -6,6 +6,10 @@ within 24 hours, and an invoice item posted when the period closes is computed n
 
 An invoice carries one line per feature per billing period (#124): several charges for the same feature
 in the same period fold into one. Per-label detail is the usage page's job, not the invoice's.
+
+Every charge is idempotent (ADR 0007, postmortem 2026-08-03): its key is the merchant, the feature and the
+period; post_charge() is a no-op when the key was posted before and hands Stripe the same key. Posting a
+charge twice, for any reason, bills once.
 """
 
 from dataclasses import dataclass
@@ -33,13 +37,25 @@ class Charge:
         month = date.fromisoformat(self.period + "-01").strftime("%B %Y")
         return f"{FEATURE_LABEL.get(self.feature, self.feature)}, {month}: {self.quantity} × ${self.unit_price}"
 
+    @property
+    def idempotency_key(self) -> str:
+        return f"{self.merchant_id}:{self.feature}:{self.period}"
 
-def post_charge(stripe, customer_id: str, charge: Charge) -> str:
-    """Post one charge as an invoice item on the merchant's upcoming invoice. Returns Stripe's item id."""
+
+def post_charge(stripe, posted, customer_id: str, charge: Charge) -> str | None:
+    """Post one charge as an invoice item on the merchant's upcoming invoice.
+
+    `posted` is the posted_charges table (app/billing/posted.py). Returns Stripe's item id, or None when this
+    charge was posted before.
+    """
+    if posted.seen(charge.idempotency_key):
+        return None
     item = stripe.InvoiceItem.create(
         customer=customer_id,
         amount=int(charge.amount * 100),
         currency="usd",
         description=charge.description,
+        idempotency_key=charge.idempotency_key,
     )
+    posted.mark(charge, item["id"])
     return item["id"]
