@@ -41,12 +41,46 @@ def closed_period(today: date) -> str:
     return first.replace(month=first.month - 1).strftime("%Y-%m")
 
 
+BATCH = 100  # charges per transaction (#148): one transaction for the whole run held the lock past the Stripe calls
+
+
+def batches(items, size):
+    for start in range(0, len(items), size):
+        yield items[start:start + size]
+
+
 def run(usage, plan_of: dict[str, str], customer_of: dict[str, str], stripe, posted, *, period: str) -> int:
-    """Post the period's charges that are not posted yet. Returns how many were posted this run."""
+    """Post the period's charges that are not posted yet, BATCH per transaction. Returns how many were posted.
+
+    A batch that fails rolls back its own transaction only; the next run posts it (every charge is idempotent).
+    """
     totals = period_totals(usage, period, features=METERED)
     count = 0
-    with posted.transaction():
-        for charge in charges_for(period, totals, plan_of):
-            if post_charge(stripe, posted, customer_of[charge.merchant_id], charge):
-                count += 1
+    for batch in batches(charges_for(period, totals, plan_of), BATCH):
+        with posted.transaction():
+            for charge in batch:
+                if post_charge(stripe, posted, customer_of[charge.merchant_id], charge):
+                    count += 1
     return count
+
+
+def main(today: date | None = None) -> int:  # pragma: no cover - needs Postgres and Stripe
+    import stripe
+
+    from app.billing.posted import PostedCharges
+    from app.core.db import transaction
+    from app.usage.store import UsageStore
+
+    with transaction() as cur:
+        cur.execute("SELECT id, plan, stripe_customer_id FROM merchants WHERE stripe_customer_id IS NOT NULL")
+        rows = cur.fetchall()
+    plan_of = {row[0]: row[1] for row in rows}
+    customer_of = {row[0]: row[2] for row in rows}
+    period = closed_period(today or date.today())
+    count = run(UsageStore(), plan_of, customer_of, stripe, PostedCharges(), period=period)
+    print(f"billing: {count} charges posted for {period}")
+    return count
+
+
+if __name__ == "__main__":
+    main()

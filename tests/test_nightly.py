@@ -51,3 +51,17 @@ def test_rerunning_the_job_posts_nothing_twice():
     assert run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, posted, period="2026-06") == 1
     assert run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, posted, period="2026-06") == 0
     assert len(FakeStripe.InvoiceItem.created) == 1
+
+
+def test_charges_post_in_batches_of_one_hundred():
+    from app.billing.nightly import BATCH
+
+    FakeStripe.InvoiceItem.created.clear()
+    merchants = [f"s{i:03d}" for i in range(250)]
+    usage = FakeUsage(rows_for(merchants, [1], count=1_001))
+    posted = FakePostedTable()
+    plan_of = {m: "starter" for m in merchants}
+    customer_of = {m: f"cus_{m}" for m in merchants}
+    assert BATCH == 100
+    assert run(usage, plan_of, customer_of, FakeStripe, posted, period="2026-06") == 250
+    assert posted.transactions == 3
