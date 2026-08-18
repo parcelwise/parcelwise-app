@@ -19,6 +19,7 @@ export function OrdersTable({ orders, onBuyLabel }: Props) {
           <th>Customer</th>
           <th>Item</th>
           <th>Weight</th>
+          <th>Waiting</th>
           <th />
         </tr>
       </thead>
