@@ -7,3 +7,4 @@
 /web/                   @parcelwise/dashboard
 /infra/                 @parcelwise/platform
 /migrations/            @parcelwise/platform
+/app/orders/queries.py  @parcelwise/checkout @parcelwise/labels

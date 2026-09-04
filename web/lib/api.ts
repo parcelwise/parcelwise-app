@@ -26,3 +26,5 @@ export const buyLabel = (orderId: string, rateId: string, shownPrice: string) =>
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ rate_id: rateId, shown_price: shownPrice }),
   });
+
+export const searchOrders = (q: string) => call<Order[]>(`/orders/search?q=${encodeURIComponent(q)}`);
