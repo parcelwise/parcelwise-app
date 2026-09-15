@@ -10,8 +10,9 @@ class UsageStore:
     def record(self, event) -> None:
         with transaction() as cur:
             cur.execute(
-                "INSERT INTO usage_events (merchant_id, feature, request_id, at) VALUES (%s, %s, %s, %s)",
-                (event.merchant_id, event.feature, event.request_id, event.at),
+                "INSERT INTO usage_events (merchant_id, feature, request_id, at, status, attempt) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (event.merchant_id, event.feature, event.request_id, event.at, event.status, event.attempt),
             )
 
     def rollup_day(self, day: date) -> int:
@@ -21,7 +22,8 @@ class UsageStore:
             cur.execute(
                 "INSERT INTO usage_daily (day, merchant_id, feature, count) "
                 "SELECT %s, merchant_id, feature, COUNT(*) FROM usage_events "
-                "WHERE at >= %s AND at < %s + INTERVAL '1 day' GROUP BY merchant_id, feature",
+                "WHERE at >= %s AND at < %s + INTERVAL '1 day' AND status <> 'voided' "
+                "GROUP BY merchant_id, feature",
                 (day, day, day),
             )
             return cur.rowcount

@@ -1,0 +1,2 @@
+ALTER TABLE usage_events ADD COLUMN status TEXT NOT NULL DEFAULT 'completed';
+ALTER TABLE usage_events ADD COLUMN attempt INT NOT NULL DEFAULT 1;
