@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.31.0 (2026-09-30)
+
+- Order search by SKU or customer name (#198)
+- Every label purchase goes through `purchase_label()` (#212)
+
 ## 0.24.0 (2026-07-21)
 
 - Letter-size label sheets (#131)
