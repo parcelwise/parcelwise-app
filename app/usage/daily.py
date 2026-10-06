@@ -54,3 +54,10 @@ def period_totals(usage, period: str, *, features) -> dict[tuple[str, str], int]
 def rollup(usage, day: date) -> int:
     """Fold usage_events for `day` into usage_daily. Idempotent: re-running a day replaces its rows."""
     return usage.rollup_day(day)
+
+
+def month_to_date(usage, merchant_id: str, today: date, *, features) -> dict[str, int]:
+    """One merchant's counts so far this month, per feature. Reads the daily counts like everything else."""
+    period = today.strftime("%Y-%m")
+    totals = period_totals(usage, period, features=features)
+    return {feature: totals.get((merchant_id, feature), 0) for feature in sorted(features)}

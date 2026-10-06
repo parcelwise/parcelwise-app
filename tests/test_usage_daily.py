@@ -50,3 +50,13 @@ def test_rows_inserted_while_walking_are_not_skipped_or_repeated():
         if after is None:
             break
     assert len(seen) == len({r.cursor for r in seen}) == 60
+
+
+def test_month_to_date_is_one_merchant_this_month():
+    from app.usage.daily import month_to_date
+
+    usage = FakeUsage(rows_for(["m1", "m2"], range(1, 7)) + rows_for(["m1"], [3, 4], feature="assistant", count=5))
+    assert month_to_date(usage, "m1", date(2026, 6, 6), features={"labels", "assistant"}) == {
+        "assistant": 10,
+        "labels": 18,
+    }
