@@ -6,6 +6,7 @@ services:
   api:
     command: gunicorn app.api.wsgi:app --workers 4 --timeout 30
     instances: 2
+    autoscale: { min: 2, max: 4, target_cpu: 60 }
     memory: 1024mb
     healthcheck: /healthz
     env:
