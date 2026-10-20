@@ -3,7 +3,10 @@
 /app/labels/            @parcelwise/labels
 /app/orders/            @parcelwise/labels @parcelwise/dashboard
 /app/shopify/           @parcelwise/integrations
+/app/assistant/         @parcelwise/assistant
+/app/usage/             @parcelwise/labels
 /app/billing/           @parcelwise/revenue @parcelwise/platform
+/app/billing/plans.py   @parcelwise/revenue
 /web/                   @parcelwise/dashboard
 /infra/                 @parcelwise/platform
 /migrations/            @parcelwise/platform

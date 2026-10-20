@@ -13,7 +13,8 @@ See [docs/architecture.md](docs/architecture.md) for how the pieces fit.
 | `app/orders/` | Orders synced from Shopify |
 | `app/shopify/` | Shopify sync and webhooks |
 | `app/assistant/` | The Parcelwise Assistant |
-| `app/billing/` | Plans and Stripe |
+| `app/usage/` | Usage events and daily counts |
+| `app/billing/` | Plans, charges and Stripe |
 | `web/` | The merchant dashboard (Next.js) |
 | `infra/` | Deploy config and Terraform |
 | `migrations/` | Postgres migrations, applied in order |
