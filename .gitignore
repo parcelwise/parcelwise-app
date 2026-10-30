@@ -9,3 +9,4 @@ node_modules/
 *.tfstate*
 .terraform/
 .claude/settings.local.json
+*.egg-info/
