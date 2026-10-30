@@ -38,7 +38,7 @@ def test_one_purchase_per_order_with_its_own_key(fake, fresh_rate):
     clock = FakeClock()
     result = buy_labels(items(3, fresh_rate), batch_id="b1", sleep=clock.sleep, clock=clock)
     assert fake.bought == ["b1:o0", "b1:o1", "b1:o2"]
-    assert [l.order_id for l in result.bought] == ["o0", "o1", "o2"]
+    assert [label.order_id for label in result.bought] == ["o0", "o1", "o2"]
 
 
 def test_at_most_forty_purchases_a_minute(fake, fresh_rate):
@@ -73,7 +73,7 @@ def test_keeps_going_past_failures(monkeypatch, fresh_rate):
     monkeypatch.setitem(carriers.CARRIERS, "usps", lambda account: flaky)
     clock = FakeClock()
     result = buy_labels(items(4, fresh_rate), batch_id="b1", sleep=clock.sleep, clock=clock)
-    assert [l.order_id for l in result.bought] == ["o0", "o3"]
+    assert [label.order_id for label in result.bought] == ["o0", "o3"]
     assert result.failed == {"o1": "address invalid", "o2": "'usps'"}
 
 
