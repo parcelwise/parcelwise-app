@@ -27,4 +27,17 @@ export const buyLabel = (orderId: string, rateId: string, shownPrice: string) =>
     body: JSON.stringify({ rate_id: rateId, shown_price: shownPrice }),
   });
 
-export const searchOrders = (q: string) => call<Order[]>(`/orders/search?q=${encodeURIComponent(q)}`);
+export const listUnfulfilledOrderIds = () => call<string[]>("/orders/unfulfilled/ids");
+
+// Each order carries the price the merchant saw. The server buys in the background and skips any order whose
+// price changed; a 402 means the batch would go past this month's labels and nothing was bought.
+export const buyLabels = (items: { orderId: string; rateId: string; shownPrice: string }[]) =>
+  call<{ batchId: string }>("/labels/bulk", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      items: items.map((i) => ({ order_id: i.orderId, rate_id: i.rateId, shown_price: i.shownPrice })),
+    }),
+  });
+
+export const searchOrders =(q: string) => call<Order[]>(`/orders/search?q=${encodeURIComponent(q)}`);

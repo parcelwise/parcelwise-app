@@ -7,4 +7,6 @@ ROUTES = {
     ("POST", "/webhooks/stripe"): "app.billing.stripe_webhooks:handle_event",
     ("POST", "/webhooks/shopify"): "app.shopify.webhooks:verify",
     ("GET", "/api/orders/search"): "app.orders.queries:search_orders",
+    ("GET", "/api/orders/unfulfilled/ids"): "app.orders.queries:unfulfilled_order_ids",
+    ("POST", "/api/labels/bulk"): "app.labels.bulk:start_bulk_purchase",
 }
