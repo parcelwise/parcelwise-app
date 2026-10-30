@@ -1,8 +1,8 @@
 # 0005: Bulk label purchases run as jobs in Postgres
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-30
-- Deciders: Marcus Lee (pending); Ana Ruiz decided the job and the rate cap
+- Deciders: Marcus Lee; Ana Ruiz decided the job and the rate cap
 
 ## Context
 
