@@ -13,4 +13,13 @@ services:
       DATABASE_POOL_SIZE: "10"
       STATEMENT_TIMEOUT_MS: "5000"
 
+  # Runs bulk label batches from Postgres (ADR 0005). Exactly one instance: it re-queues batches left running.
+  label-worker:
+    command: python -m app.labels.worker
+    instances: 1
+    memory: 512mb
+    env:
+      DATABASE_POOL_SIZE: "2"
+      STATEMENT_TIMEOUT_MS: "5000"
+
 release_command: python -m scripts.migrate

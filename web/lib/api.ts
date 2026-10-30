@@ -40,4 +40,14 @@ export const buyLabels = (items: { orderId: string; rateId: string; shownPrice: 
     }),
   });
 
+export type BulkStatus = {
+  status: "queued" | "running" | "done";
+  bought: { order_id: string; tracking_number: string }[];
+  stale: string[];
+  failed: Record<string, string>;
+  pending: number;
+};
+
+export const getBulkPurchase = (batchId: string) => call<BulkStatus>(`/labels/bulk/${batchId}`);
+
 export const searchOrders =(q: string) => call<Order[]>(`/orders/search?q=${encodeURIComponent(q)}`);

@@ -60,29 +60,47 @@ def test_stale_and_changed_prices_are_skipped_not_bought(fake, fresh_rate):
     assert result.stale == ["stale", "changed"]
 
 
-def test_keeps_going_past_carrier_failures(monkeypatch, fresh_rate):
+def test_keeps_going_past_failures(monkeypatch, fresh_rate):
     class Flaky(FakeCarrier):
         def buy(self, order, rate, *, idempotency_key):
             if order.id == "o1":
                 raise CarrierError("address invalid")
+            if order.id == "o2":
+                raise KeyError("usps")
             return super().buy(order, rate, idempotency_key=idempotency_key)
 
     flaky = Flaky()
     monkeypatch.setitem(carriers.CARRIERS, "usps", lambda account: flaky)
     clock = FakeClock()
-    result = buy_labels(items(3, fresh_rate), batch_id="b1", sleep=clock.sleep, clock=clock)
-    assert [l.order_id for l in result.bought] == ["o0", "o2"]
-    assert result.failed == {"o1": "address invalid"}
+    result = buy_labels(items(4, fresh_rate), batch_id="b1", sleep=clock.sleep, clock=clock)
+    assert [l.order_id for l in result.bought] == ["o0", "o3"]
+    assert result.failed == {"o1": "address invalid", "o2": "'usps'"}
+
+
+class RecordingConn:
+    def __init__(self):
+        self.statements = []
+
+    def execute(self, sql, params=()):
+        self.statements.append((sql, params))
 
 
 def test_batch_over_allowance_is_refused_up_front(fresh_rate):
-    queued = []
+    conn = RecordingConn()
     with pytest.raises(AllowanceExceeded) as refused:
         start_bulk_purchase(
-            items(200, fresh_rate), batch_id="b1", plan="starter", used_this_month=900, enqueue=queued.append
+            conn, items(200, fresh_rate), batch_id="b1", merchant_id="m1", plan="starter", used_this_month=900
         )
     assert refused.value.labels_left == 100
-    assert queued == []
+    assert conn.statements == []
+
+
+def test_queued_batch_keeps_the_price_the_merchant_saw(fresh_rate):
+    conn = RecordingConn()
+    start_bulk_purchase(conn, items(2, fresh_rate), batch_id="b1", merchant_id="m1", plan="growth", used_this_month=0)
+    assert conn.statements[0][1] == ("b1", "m1")
+    assert [params[2] for _, params in conn.statements[1:]] == ["o0", "o1"]
+    assert all(params[-1] == Decimal("5.40") for _, params in conn.statements[1:])
 
 
 def test_allowance_allows_exactly_the_limit_and_unlimited_plans():
