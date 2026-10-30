@@ -10,6 +10,15 @@ def unfulfilled_orders(conn, merchant_id: str, *, page: int = 0):
     ).fetchall()
 
 
+def unfulfilled_order_ids(conn, merchant_id: str) -> list[str]:
+    """Every unfulfilled order, across pages, for "select all" on the Orders page."""
+    rows = conn.execute(
+        "SELECT id FROM orders WHERE merchant_id = %s AND status = 'unfulfilled' ORDER BY created_at",
+        (merchant_id,),
+    ).fetchall()
+    return [row[0] for row in rows]
+
+
 def search_orders(conn, merchant_id: str, query: str):
     like = f"%{query}%"
     return conn.execute(

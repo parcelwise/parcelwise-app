@@ -33,4 +33,5 @@ Shopify ──webhooks──▶ app/shopify ──▶ orders (Postgres) ──�
 ## Background work
 
 Shopify sync runs on a five-minute cron. Shipping confirmation emails go out through Postmark right after a
-purchase. Stripe webhooks update the merchant's plan.
+purchase. Stripe webhooks update the merchant's plan. Bulk label batches run in the `label-worker` service from a
+job table in Postgres, one batch per merchant at a time ([ADR 0005](adr/0005-bulk-labels-run-in-a-postgres-job-table.md)).
