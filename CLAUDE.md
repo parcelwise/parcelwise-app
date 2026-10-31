@@ -25,7 +25,7 @@ the record ("does ADR 0006 hold given that..."). Your reading of the record, wit
 goes in `context`. File each question once and do not re-word a question that is already open. Put `paths` and
 a `category` on every node: `pricing` (rates, allowances, which plans), `billing` (charges, invoices, Stripe),
 `data` (what is counted, which table is read), `customer` (which merchants, exceptions), `ux` (the dashboard),
-`integrations` (Shopify).
+`compat` (Shopify and the App Store rules).
 
 Never settle an open value yourself: no placeholder rate, allowance, start date or merchant list, and no default
 that quietly decides one. Build the parts that do not depend on open calls (`bridge_wait` says what is still
