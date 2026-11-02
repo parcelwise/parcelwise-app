@@ -20,7 +20,7 @@ from app.shopify.install import APP_STORE
 from app.usage.daily import ASSISTANT_ANSWERS, period_totals
 
 CHARGE = "charge"  # App Store installs are charged through Stripe like everyone else
-SKIP = "skip"  # App Store installs are not charged for this feature
+SKIP = "skip"  # App Store installs are never charged through Stripe for this feature
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,8 @@ class Metered:
     allowance_key: str  # the plan key for what the subscription includes
     price_key: str  # the plan key for the price past the allowance
     starts: str | Undecided | None = None  # first billed period, "YYYY-MM"; None means no start limit
-    exempt: frozenset[str] | Undecided = field(default_factory=frozenset)  # merchants never charged for it
+    # merchant id -> the last period it is exempt for ("YYYY-MM"), or None for no end
+    exempt: dict[str, str | None] | Undecided = field(default_factory=dict)
     app_store: str | Undecided = CHARGE  # CHARGE or SKIP for merchants who installed from the App Store
 
     def open_inputs(self) -> list[Undecided]:
@@ -54,11 +55,15 @@ METERED = {
         usage_feature=ASSISTANT_ANSWERS,  # completed answers, one per request id; not attempts (Jordan)
         allowance_key="assistant_answers_per_month",
         price_key="extra_assistant_answer_price",
-        starts=Undecided("Which month is the first one we charge assistant usage for?", "Marcus Lee"),
-        exempt=Undecided("Which merchants are exempt from assistant charges (Bloom & Co, anyone else)?",
-                         "Sam Rivera"),
-        app_store=Undecided("Do App Store installs get assistant charges through Stripe, or not for now?",
-                            "Theo Grant"),
+        # December usage, on the January invoice: a full month of the count on the Plan page first (Marcus).
+        starts="2026-12",
+        # Bloom & Co only, until their order form renews in February (Sam). Their merchant id and the last exempt
+        # billing month are still needed; until then the assistant posts nothing for anyone.
+        exempt=Undecided("What is Bloom & Co's merchant id, and which billing month is the last one they are "
+                         "exempt for (order form renews in February)?", "Sam Rivera"),
+        # Never through Stripe for an App Store install; they are charged through Shopify Billing (Theo), which
+        # is not built yet, so this job skips them.
+        app_store=SKIP,
     ),
 }
 
@@ -88,7 +93,7 @@ def charges_for(period: str, totals: dict[tuple[str, str], int], plan_of: dict[s
             continue
         if m.starts is not None and period < m.starts:
             continue
-        if merchant_id in m.exempt:
+        if merchant_id in m.exempt and (m.exempt[merchant_id] is None or period <= m.exempt[merchant_id]):
             continue
         if m.app_store == SKIP and install_of.get(merchant_id) == APP_STORE:
             continue

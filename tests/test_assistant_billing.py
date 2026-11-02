@@ -22,17 +22,21 @@ PRICE = Decimal("0.04")  # Priya's rate
 
 @pytest.fixture
 def decided():
-    """The assistant with its still-open inputs (start month, exemptions, App Store rule) filled in by stand-ins,
-    for testing the mechanism only."""
-    assistant = replace(METERED["assistant"], starts="2026-06",
-                        exempt=frozenset({"bloom"}), app_store=SKIP)
+    """The assistant with its one open input (Bloom & Co's id and last exempt month) filled in by a stand-in,
+    and an earlier start so June test data bills."""
+    assistant = replace(METERED["assistant"], starts="2026-06", exempt={"bloom": "2026-07", "forever": None})
     return {"labels": METERED["labels"], "assistant": assistant}
 
 
 def test_shipped_config_bills_no_assistant_while_inputs_are_open():
     assert "assistant" not in ready() and "labels" in ready()
     owners = {value.owner for value in waiting()["assistant"]}
-    assert owners == {"Sam Rivera", "Marcus Lee", "Theo Grant"}
+    assert owners == {"Sam Rivera"}
+
+
+def test_first_billed_month_is_december_and_app_store_installs_never_go_through_stripe():
+    assert METERED["assistant"].starts == "2026-12"
+    assert METERED["assistant"].app_store == SKIP
 
 
 def test_starter_includes_200_answers_and_growth_1000():
@@ -74,11 +78,15 @@ def test_nothing_before_the_start_month(decided):
     assert charges_for("2026-05", {("m1", ASSISTANT_ANSWERS): 340}, PLAN_OF, metered=decided) == []
 
 
-def test_exempt_merchants_are_never_charged(decided):
-    assert charges_for("2026-06", {("bloom", ASSISTANT_ANSWERS): 5_000}, PLAN_OF, metered=decided) == []
+def test_exemptions_hold_through_their_last_month(decided):
+    plan_of = dict(PLAN_OF, forever="growth")
+    totals = {("bloom", ASSISTANT_ANSWERS): 5_000, ("forever", ASSISTANT_ANSWERS): 5_000}
+    assert charges_for("2026-06", totals, plan_of, metered=decided) == []
+    assert charges_for("2026-07", totals, plan_of, metered=decided) == []
+    assert [c.merchant_id for c in charges_for("2026-08", totals, plan_of, metered=decided)] == ["bloom"]
 
 
-def test_app_store_installs_skipped_when_the_rule_says_skip(decided):
+def test_app_store_installs_are_skipped(decided):
     totals = {("shop", ASSISTANT_ANSWERS): 500}
     assert charges_for("2026-06", totals, PLAN_OF, install_of={"shop": "app_store"}, metered=decided) == []
     assert len(charges_for("2026-06", totals, PLAN_OF, install_of={"shop": "direct"}, metered=decided)) == 1
