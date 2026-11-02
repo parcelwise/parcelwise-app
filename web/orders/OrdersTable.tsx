@@ -1,4 +1,5 @@
 import { Order } from "@/lib/api";
+import { BULK_LABEL_BUYING } from "@/lib/features";
 import { OrderRow } from "./OrderRow";
 
 type Props = {
@@ -21,7 +22,8 @@ export function OrdersTable({
   matchingCount,
   onSelectAllMatching,
   onBuySelected,
-}: Props) {
+  bulk = BULK_LABEL_BUYING,
+}: Props & { bulk?: boolean }) {
   if (orders.length === 0) {
     return <p className="empty">No unfulfilled orders. New Shopify orders show up here within a minute.</p>;
   }
@@ -46,7 +48,7 @@ export function OrdersTable({
 
   return (
     <>
-      {selectedIds.size > 0 && (
+      {bulk && selectedIds.size > 0 && (
         <div className="bulk-bar" role="region" aria-label="Selected orders">
           <span>{selectedIds.size} selected</span>
           {allOnPage && selectedIds.size < matchingCount && (
@@ -63,14 +65,16 @@ export function OrdersTable({
       <table className="orders">
         <thead>
           <tr>
-            <th>
-              <input
+            {bulk && (
+              <th>
+                <input
                 type="checkbox"
-                aria-label="Select all on this page"
-                checked={allOnPage}
-                onChange={togglePage}
-              />
-            </th>
+                  aria-label="Select all on this page"
+                  checked={allOnPage}
+                  onChange={togglePage}
+                />
+              </th>
+            )}
             <th>Order</th>
             <th>Customer</th>
             <th>Item</th>
@@ -85,7 +89,7 @@ export function OrdersTable({
               key={order.id}
               order={order}
               selected={selectedIds.has(order.id)}
-              onToggle={toggle}
+              onToggle={bulk ? toggle : undefined}
               onBuyLabel={onBuyLabel}
             />
           ))}

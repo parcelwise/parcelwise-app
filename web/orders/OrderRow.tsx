@@ -4,21 +4,24 @@ import { age } from "@/lib/time";
 type Props = {
   order: Order;
   selected: boolean;
-  onToggle: (order: Order) => void;
+  // Left out while bulk buying is switched off; the row then has no checkbox.
+  onToggle?: (order: Order) => void;
   onBuyLabel: (order: Order) => void;
 };
 
 export function OrderRow({ order, selected, onToggle, onBuyLabel }: Props) {
   return (
     <tr className={selected ? "selected" : undefined}>
-      <td>
-        <input
-          type="checkbox"
-          aria-label={`Select order #${order.shopifyId}`}
-          checked={selected}
-          onChange={() => onToggle(order)}
-        />
-      </td>
+      {onToggle && (
+        <td>
+          <input
+            type="checkbox"
+            aria-label={`Select order #${order.shopifyId}`}
+            checked={selected}
+            onChange={() => onToggle(order)}
+          />
+        </td>
+      )}
       <td>#{order.shopifyId}</td>
       <td>{order.customer}</td>
       <td>
