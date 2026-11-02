@@ -21,10 +21,9 @@ PRICE = Decimal("0.04")  # Priya's rate
 
 
 @pytest.fixture
-def decided(monkeypatch):
-    """The assistant with every open input filled in by a stand-in, for testing the mechanism only."""
-    for name in ("starter", "growth"):
-        monkeypatch.setitem(plans.PLANS[name], "assistant_answers_per_month", 100)
+def decided():
+    """The assistant with its still-open inputs (start month, exemptions, App Store rule) filled in by stand-ins,
+    for testing the mechanism only."""
     assistant = replace(METERED["assistant"], starts="2026-06",
                         exempt=frozenset({"bloom"}), app_store=SKIP)
     return {"labels": METERED["labels"], "assistant": assistant}
@@ -34,6 +33,11 @@ def test_shipped_config_bills_no_assistant_while_inputs_are_open():
     assert "assistant" not in ready() and "labels" in ready()
     owners = {value.owner for value in waiting()["assistant"]}
     assert owners == {"Priya Shah", "Marcus Lee", "Theo Grant"}
+
+
+def test_starter_includes_200_answers_and_growth_1000():
+    assert plans.PLANS["starter"]["assistant_answers_per_month"] == 200
+    assert plans.PLANS["growth"]["assistant_answers_per_month"] == 1_000
 
 
 def test_starter_and_growth_pay_four_cents_an_answer():
@@ -56,13 +60,13 @@ def test_shipped_config_posts_only_labels():
 
 
 def test_starter_and_growth_pay_past_the_allowance_and_free_never(decided):
-    totals = {("m1", ASSISTANT_ANSWERS): 340, ("m2", ASSISTANT_ANSWERS): 100, ("m3", ASSISTANT_ANSWERS): 500}
+    totals = {("m1", ASSISTANT_ANSWERS): 340, ("m2", ASSISTANT_ANSWERS): 1_000, ("m3", ASSISTANT_ANSWERS): 500}
     charges = charges_for("2026-06", totals, PLAN_OF, metered=decided)
-    assert charges == [Charge("m1", "assistant", "2026-06", 240, PRICE)]
+    assert charges == [Charge("m1", "assistant", "2026-06", 140, PRICE)]
 
 
 def test_growth_pays_too(decided):
-    charges = charges_for("2026-06", {("m2", ASSISTANT_ANSWERS): 101}, PLAN_OF, metered=decided)
+    charges = charges_for("2026-06", {("m2", ASSISTANT_ANSWERS): 1_001}, PLAN_OF, metered=decided)
     assert [(c.merchant_id, c.quantity) for c in charges] == [("m2", 1)]
 
 
@@ -80,10 +84,9 @@ def test_app_store_installs_skipped_when_the_rule_says_skip(decided):
     assert len(charges_for("2026-06", totals, PLAN_OF, install_of={"shop": "direct"}, metered=decided)) == 1
 
 
-def test_billed_count_is_whichever_usage_feature_is_decided(decided):
-    metered = dict(decided, assistant=replace(decided["assistant"], usage_feature="assistant_answers"))
-    totals = {("m1", ASSISTANT_ANSWERS): 900, ("m1", "assistant_answers"): 150}
-    (charge,) = charges_for("2026-06", totals, PLAN_OF, metered=metered)
+def test_attempts_are_never_billed(decided):
+    totals = {("m1", "assistant"): 900, ("m1", ASSISTANT_ANSWERS): 250}
+    (charge,) = charges_for("2026-06", totals, PLAN_OF, metered=decided)
     assert charge.feature == "assistant" and charge.quantity == 50
 
 
@@ -95,6 +98,6 @@ def test_one_invoice_line_per_period_and_its_own_key(decided):
     assert run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, posted, period="2026-06", metered=decided) == 2
     assistant = [c for c in FakeStripe.InvoiceItem.created if c["idempotency_key"] == "m1:assistant:2026-06"]
     assert len(assistant) == 1
-    assert assistant[0]["description"] == "Assistant answers, June 2026: 200 × $0.04"
-    assert assistant[0]["amount"] == 800
+    assert assistant[0]["description"] == "Assistant answers, June 2026: 100 × $0.04"
+    assert assistant[0]["amount"] == 400
     assert run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, posted, period="2026-06", metered=decided) == 0
