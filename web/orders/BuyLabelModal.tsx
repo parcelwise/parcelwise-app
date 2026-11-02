@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { Order, buyLabel } from "@/lib/api";
+import { Order, Quote, buyLabel } from "@/lib/api";
 import { Price } from "@/components/Price";
-
-type Quote = { rateId: string; carrier: string; service: string; price: string };
 
 // The merchant always sees the price before we buy. The server refuses a purchase at any other price.
 export function BuyLabelModal({ order, quote, onDone }: { order: Order; quote: Quote; onDone: () => void }) {
