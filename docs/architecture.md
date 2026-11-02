@@ -40,4 +40,6 @@ The `label-worker` service (`app/labels/worker.py`, one instance) buys each orde
 at most 40 USPS purchases a minute per merchant account. Before queuing, the whole batch is refused if it would go
 over the plan's monthly allowance. Orders that already have a live label are skipped for reprint. Orders whose
 quote expires or changes are returned for the merchant to approve the new price, and failures are reported for
-retry; labels that bought are kept.
+retry; labels that bought are kept. Orders fulfilled or cancelled after they were selected are left out and listed.
+If the carrier times out, a retry reuses the same idempotency key at the original price, so a label the carrier
+already issued is returned rather than bought again; if that quote has expired, the merchant approves a new price.

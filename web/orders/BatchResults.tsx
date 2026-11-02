@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
-import { LabelBatch, getLabelBatch } from "@/lib/api";
+import { BatchOrder, LabelBatch, getLabelBatch } from "@/lib/api";
 import { Spinner } from "@/components/Spinner";
 
 type Props = {
   batchId: string;
   // Re-quote these orders, show the merchant the new prices, and call retryLabelBatch with what they approve.
   onRetry: (orderIds: string[]) => void;
+  // Orders the carrier didn't answer for: call retryLabelBatch with these as they are, at the price already approved.
+  onRetryAtSamePrice: (orders: BatchOrder[]) => void;
   onReprint: (orderIds: string[]) => void;
 };
 
 const POLL_MS = 3000;
 
 // Progress of a batch. Labels that bought are kept; anything that didn't is listed with what to do next.
-export function BatchResults({ batchId, onRetry, onReprint }: Props) {
+export function BatchResults({ batchId, onRetry, onRetryAtSamePrice, onReprint }: Props) {
   const [batch, setBatch] = useState<LabelBatch | null>(null);
 
   useEffect(() => {
@@ -38,7 +40,9 @@ export function BatchResults({ batchId, onRetry, onReprint }: Props) {
   const queued = by("queued");
   const labeled = by("already_labeled");
   const requote = by("needs_requote");
-  const failed = by("failed");
+  // Timed-out orders are retried at their original price (Priya Shah, Raven e270d6d52253).
+  const timedOut = by("failed").filter((i) => i.timed_out);
+  const failed = by("failed").filter((i) => !i.timed_out);
   const dropped = by("no_longer_unfulfilled");
 
   return (
@@ -75,6 +79,19 @@ export function BatchResults({ batchId, onRetry, onReprint }: Props) {
           {requote.length} changed price before we bought them.{" "}
           <button className="link" onClick={() => onRetry(requote.map((i) => i.order_id))}>
             Review new prices
+          </button>
+        </p>
+      )}
+      {timedOut.length > 0 && (
+        <p>
+          The carrier didn't answer for {timedOut.length}. Trying again won't buy a second label.{" "}
+          <button
+            className="link"
+            onClick={() =>
+              onRetryAtSamePrice(timedOut.map((i) => ({ orderId: i.order_id, rateId: i.rate_id, shownPrice: i.price })))
+            }
+          >
+            Try again at the same price
           </button>
         </p>
       )}

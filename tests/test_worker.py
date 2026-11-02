@@ -115,3 +115,10 @@ def test_any_other_failure_uses_up_the_attempt_so_the_retry_gets_a_new_key(monke
     conn = FakeConn([row("o1")])
     work_once(conn, load_order=load, limiter=PurchaseRateLimiter())
     assert conn.writes[-1][1][3] == 1
+
+
+def test_worker_records_whether_the_attempt_timed_out(monkeypatch):
+    _failing(monkeypatch, retryable=True)
+    conn = FakeConn([row("o1")])
+    work_once(conn, load_order=load, limiter=PurchaseRateLimiter())
+    assert conn.writes[-1][1][4] is True

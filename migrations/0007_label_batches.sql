@@ -23,6 +23,8 @@ CREATE TABLE label_batch_items (
     error            TEXT,
     -- Finished purchase attempts; the idempotency key uses attempts + 1. A carrier timeout doesn't count.
     attempts         INT NOT NULL DEFAULT 0,
+    -- The last attempt timed out at the carrier: a retry keeps this rate and price, and the same key.
+    timed_out        BOOLEAN NOT NULL DEFAULT false,
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (batch_id, order_id)
 );

@@ -14,7 +14,8 @@ Decisions this follows (Raven task 444e8aaa568e):
   (Jordan Okafor, fd71f63d5869).
 - A merchant retry gets a new idempotency key, except after a carrier timeout, which reuses the last key so a label
   the carrier did issue comes back instead of being bought twice (Priya Shah, 8b0453dcb636; Jordan Okafor,
-  271f3d26c255).
+  271f3d26c255). A timed-out order is retried at its original price; if that quote has expired, the merchant is
+  asked for a new price (Priya Shah, e270d6d52253).
 - The batch is a job in Postgres, worked by the label-worker service (Marcus Lee, a6f8e89cd82c); see worker.py.
 """
 
@@ -25,7 +26,7 @@ from decimal import Decimal
 from app.billing.plans import labels_left
 from app.labels.carriers import CarrierError
 from app.labels.purchase import Label, StaleRateError, purchase_label
-from app.labels.rates import Rate
+from app.labels.rates import Rate, quote_is_fresh
 
 MAX_BATCH_ORDERS = 500
 
@@ -115,6 +116,18 @@ def plan_batch(
     return BatchPlan(to_buy=to_buy, already_labeled=already, dropped=dropped)
 
 
+def timed_out_retry(requested: BatchItem, original: BatchItem) -> BatchItem | None:
+    """The item to retry for an order whose last attempt timed out at the carrier.
+
+    It keeps the original rate and price, not the one the merchant just approved: the retry reuses the last key, so a
+    label the carrier already issued comes back at what it cost (Priya Shah, Raven e270d6d52253). Returns None if that
+    quote has expired; the order then needs a new price, and a new price gets a new key (Jordan Okafor, 271f3d26c255).
+    """
+    if not quote_is_fresh(original.rate):
+        return None
+    return BatchItem(requested.order, original.rate, original.shown_price)
+
+
 def run_item(batch_id: str, item: BatchItem, *, attempt: int, has_live_label: bool) -> ItemOutcome:
     """Buy the label for one order of a batch. The only way a batch buys anything."""
     if has_live_label:
@@ -195,6 +208,21 @@ def _set_item(conn, batch_id: str, item: BatchItem, status: str) -> None:
     )
 
 
+def _needs_new_price(conn, batch_id: str, order_id: str) -> None:
+    """A timed-out order whose original quote expired: ask for a new price. That finishes the attempt, so the order is
+    bought with a new key at the new price."""
+    conn.execute(
+        "UPDATE label_batch_items SET status = %s, timed_out = false, attempts = attempts + 1, error = %s, "
+        "updated_at = now() WHERE batch_id = %s AND order_id = %s",
+        (
+            NEEDS_REQUOTE,
+            "The carrier didn't answer and the quote has expired. Approve a new price.",
+            batch_id,
+            order_id,
+        ),
+    )
+
+
 def create_batch(conn, merchant_id: str, items: list[BatchItem]) -> str:
     """Queue a batch for the label-worker, or raise BatchRefused having queued nothing."""
     order_ids = [item.order.id for item in items]
@@ -233,12 +261,30 @@ def retry_items(conn, merchant_id: str, batch_id: str, items: list[BatchItem]) -
     """Queue failed or re-priced orders again, each at the fresh price the merchant just approved."""
     order_ids = [item.order.id for item in items]
     rows = conn.execute(
-        "SELECT order_id, status FROM label_batch_items WHERE batch_id = %s AND merchant_id = %s AND order_id = ANY(%s)",
+        "SELECT order_id, status, timed_out, carrier, service, rate_id, rate_price, quoted_at, shown_price "
+        "FROM label_batch_items WHERE batch_id = %s AND merchant_id = %s AND order_id = ANY(%s)",
         (batch_id, merchant_id, order_ids),
     ).fetchall()
-    statuses = dict(rows)
-    if len(statuses) != len(set(order_ids)) or any(s not in RETRYABLE for s in statuses.values()):
+    stored = {row[0]: row for row in rows}
+    if len(stored) != len(set(order_ids)) or any(row[1] not in RETRYABLE for row in stored.values()):
         raise BatchRefused("Only failed orders or orders waiting for a new price can be retried.")
+    retry, expired = [], []
+    for item in items:
+        _, _, timed_out, carrier, service, rate_id, rate_price, quoted_at, shown_price = stored[item.order.id]
+        if not timed_out:
+            retry.append(item)
+            continue
+        original = BatchItem(item.order, Rate(carrier, service, rate_price, quoted_at, rate_id), shown_price)
+        again = timed_out_retry(item, original)
+        if again is None:
+            expired.append(item.order.id)
+        else:
+            retry.append(again)
+    for order_id in expired:
+        _needs_new_price(conn, batch_id, order_id)
+    if not retry:
+        return
+    items, order_ids = retry, [item.order.id for item in retry]
     plan_name, used = _used_this_month(conn, merchant_id)
     labeled = _live_label_order_ids(conn, order_ids) | _queued_elsewhere(
         conn, merchant_id, order_ids, batch_id=batch_id
@@ -256,7 +302,8 @@ def retry_items(conn, merchant_id: str, batch_id: str, items: list[BatchItem]) -
 def get_batch(conn, merchant_id: str, batch_id: str) -> dict:
     """Batch progress for the Orders page: every order with its status, price and tracking number or error."""
     rows = conn.execute(
-        "SELECT order_id, status, carrier, service, shown_price, tracking_number, error FROM label_batch_items "
+        "SELECT order_id, status, carrier, service, rate_id, shown_price, tracking_number, error, timed_out "
+        "FROM label_batch_items "
         "WHERE batch_id = %s AND merchant_id = %s ORDER BY order_id",
         (batch_id, merchant_id),
     ).fetchall()
@@ -266,10 +313,13 @@ def get_batch(conn, merchant_id: str, batch_id: str) -> dict:
             "status": status,
             "carrier": carrier,
             "service": service,
+            "rate_id": rate_id,
             "price": str(price),
             "tracking_number": tracking,
             "error": error,
+            # Retrying it keeps this price and rate (Priya Shah, Raven e270d6d52253).
+            "timed_out": timed_out,
         }
-        for order_id, status, carrier, service, price, tracking, error in rows
+        for order_id, status, carrier, service, rate_id, price, tracking, error, timed_out in rows
     ]
     return {"id": batch_id, "done": all(item["status"] != QUEUED for item in items), "items": items}

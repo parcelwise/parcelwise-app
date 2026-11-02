@@ -47,9 +47,12 @@ export type LabelBatch = {
     status: BatchItemStatus;
     carrier: string;
     service: string;
+    rate_id: string;
     price: string;
     tracking_number: string | null;
     error: string | null;
+    // The carrier didn't answer. A retry keeps this price and rate; the server ignores any new one.
+    timed_out: boolean;
   }[];
 };
 

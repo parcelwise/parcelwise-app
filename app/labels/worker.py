@@ -63,12 +63,13 @@ def work_once(conn, *, load_order, limiter: PurchaseRateLimiter) -> float:
         conn.execute("UPDATE merchants SET labels_this_month = labels_this_month + 1 WHERE id = %s", (merchant_id,))
     conn.execute(
         "UPDATE label_batch_items SET status = %s, tracking_number = %s, error = %s, attempts = attempts + %s, "
-        "updated_at = now() WHERE batch_id = %s AND order_id = %s",
+        "timed_out = %s, updated_at = now() WHERE batch_id = %s AND order_id = %s",
         (
             outcome.status,
             outcome.label.tracking_number if outcome.label else None,
             outcome.error or None,
             0 if outcome.timed_out else 1,
+            outcome.timed_out,
             batch_id,
             order_id,
         ),
