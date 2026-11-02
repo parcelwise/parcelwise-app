@@ -41,6 +41,9 @@ Ask ──▶ app/assistant ──▶ model                 purchases, answers �
 - Charges post through the nightly billing job, as Stripe invoice items; nothing charges at purchase time
   ([ADR 0006](adr/0006-charges-post-through-the-nightly-job.md)).
 - Every charge is idempotent ([ADR 0007](adr/0007-every-charge-is-idempotent.md)).
+- A metered feature is a `Metered` entry in `app/billing/nightly.py` plus its plan keys. The assistant is one, but
+  it charges nothing until its rate, allowance, start month, exempt shops and App Store treatment are filled in.
+  Until then the nightly job does not read assistant usage at all.
 
 ## Background work
 
