@@ -7,6 +7,7 @@ Decisions this follows (Raven task a54e7ec0dbe6, 2026-11-02):
 - If an order fails, keep going and report it for retry (Jordan Okafor).
 - If a quote went stale or changed, skip that order and ask the merchant to approve the new price (Priya Shah).
 - At most 40 USPS purchases a minute per merchant, on the merchant's own account (Ana Ruiz).
+- UPS gets the same cap of 40 a minute per merchant; UPS hasn't told us its limit (Ana Ruiz).
 """
 
 import time
@@ -18,8 +19,8 @@ from app.billing.plans import how_many_fit
 from app.labels.purchase import Label, StaleRateError, purchase_label
 from app.labels.rates import Rate
 
-# Purchases per minute, per merchant and carrier. Carriers not listed are not throttled (unchanged from today).
-PURCHASES_PER_MINUTE = {"usps": 40}
+# Purchases per minute, per merchant and carrier.
+PURCHASES_PER_MINUTE = {"usps": 40, "ups": 40}
 
 QUEUED = "queued"
 BOUGHT = "bought"

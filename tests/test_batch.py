@@ -128,7 +128,18 @@ def test_usps_limit_is_40_a_minute_per_merchant():
     assert slept == [60.0]
 
 
-def test_other_carriers_are_not_throttled():
-    limiter = PerMinuteLimiter(clock=lambda: 0.0, sleep=lambda s: (_ for _ in ()).throw(AssertionError("slept")))
-    for _ in range(100):
+def test_ups_is_capped_at_40_a_minute_too():
+    clock = [0.0]
+    slept = []
+
+    def sleep(seconds):
+        slept.append(seconds)
+        clock[0] += seconds
+
+    limiter = PerMinuteLimiter(clock=lambda: clock[0], sleep=sleep)
+    for _ in range(40):
         limiter.wait("bloom", "ups")
+    limiter.wait("bloom", "usps")  # each carrier has its own window
+    assert slept == []
+    limiter.wait("bloom", "ups")
+    assert slept == [60.0]
