@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Bulk label buying for merchants with `bulk_labels_enabled` (Bloom & Co first): select up to 200 orders on the Orders page and a background worker buys them serially, 40 a minute, skipping and reporting orders that already have a label or whose price changed
+
 ## 0.31.0 (2026-09-30)
 
 - Order search by SKU or customer name (#198)

@@ -28,3 +28,39 @@ export const buyLabel = (orderId: string, rateId: string, shownPrice: string) =>
   });
 
 export const searchOrders = (q: string) => call<Order[]>(`/orders/search?q=${encodeURIComponent(q)}`);
+
+// Bulk label buying (Raven task 051ffb8e9c2d). The server refuses more than 200 orders in one batch.
+export type BulkQuote = {
+  orderId: string;
+  carrier: string;
+  service: string;
+  rateId: string;
+  price: string;
+  quotedAt: string;
+};
+
+export type BulkItem = {
+  orderId: string;
+  status: "pending" | "bought" | "skipped";
+  reason: string;
+  trackingNumber: string;
+};
+
+export type BulkProgress = {
+  batchId: number;
+  status: "pending" | "running" | "done";
+  counts: { bought: number; skipped: number; pending: number };
+  items: BulkItem[];
+};
+
+export const unfulfilledOrderIds = () =>
+  call<{ ids: string[]; total: number; limit: number }>("/orders/unfulfilled/ids");
+
+export const createBulkBatch = (quotes: BulkQuote[]) =>
+  call<{ batchId: number; toBuy: number; skipped: { orderId: string; reason: string }[] }>("/labels/bulk", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ quotes }),
+  });
+
+export const getBulkBatch = (batchId: number) => call<BulkProgress>(`/labels/bulk/${batchId}`);
