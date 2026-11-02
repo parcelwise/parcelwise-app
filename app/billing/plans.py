@@ -2,14 +2,33 @@
 
 A plan's allowance is what the subscription includes. Past it, a plan with an `extra_label_price` keeps buying
 and pays per label on the next invoice (app/billing/nightly.py); a plan without one stops.
+
+The assistant is metered on Starter and Growth, in arrears on the monthly invoice like extra labels (Priya,
+founders sync Oct 29). Free has no assistant, so nothing is metered there. The included answers and the price
+per answer past them are still Priya's to set: they stay `Open` until she does, and nothing charges for the
+assistant while they are.
 """
 
 from decimal import Decimal
 
+from app.billing.open_calls import Open
+
+ASSISTANT_ALLOWANCE = Open("3e7cfb720dab", "How many assistant answers a month are included, per plan?")
+ASSISTANT_PRICE = Open("ea7114b15829", "What is the price per assistant answer past the allowance, per plan?")
+
 PLANS = {
-    "free": {"labels_per_month": 50, "assistant": False, "extra_label_price": None},
-    "starter": {"labels_per_month": 1_000, "assistant": True, "extra_label_price": Decimal("0.08")},
-    "growth": {"labels_per_month": None, "assistant": True, "extra_label_price": None},
+    "free": {
+        "labels_per_month": 50, "assistant": False, "extra_label_price": None,
+        "assistant_answers_per_month": None, "assistant_answer_price": None,
+    },
+    "starter": {
+        "labels_per_month": 1_000, "assistant": True, "extra_label_price": Decimal("0.08"),
+        "assistant_answers_per_month": ASSISTANT_ALLOWANCE, "assistant_answer_price": ASSISTANT_PRICE,
+    },
+    "growth": {
+        "labels_per_month": None, "assistant": True, "extra_label_price": None,
+        "assistant_answers_per_month": ASSISTANT_ALLOWANCE, "assistant_answer_price": ASSISTANT_PRICE,
+    },
 }
 
 
