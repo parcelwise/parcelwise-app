@@ -17,6 +17,12 @@ from app.labels.rates import Rate
 # every order keeps the same idempotency key, and bought orders are not tried again.
 STUCK_AFTER = "15 minutes"
 
+# Labels this merchant bought this calendar month (database time zone) that haven't been voided.
+USED_THIS_MONTH = (
+    "SELECT count(*) FROM labels l JOIN orders o ON o.id = l.order_id "
+    "WHERE o.merchant_id = %s AND l.voided_at IS NULL AND l.created_at >= date_trunc('month', now())"
+)
+
 
 @dataclass(frozen=True)
 class Selection:
@@ -43,13 +49,16 @@ def _items(selections: list[Selection]) -> list[BulkItem]:
 
 
 def _plan(conn, merchant_id: str, selections: list[Selection], *, lock: bool = False) -> BulkPlan:
-    """Labels still waiting in another of this merchant's jobs count as used, and their orders as labelled, so
-    two bulk buys can't overspend the allowance or buy the same order twice. `lock` holds the merchant row until
-    the transaction ends, so two enqueues for one merchant run one after the other."""
-    plan, used = conn.execute(
-        "SELECT plan, labels_this_month FROM merchants WHERE id = %s" + (" FOR UPDATE" if lock else ""),
+    """Labels used this month are counted from the labels table: every label bought this calendar month, single
+    or bulk, that hasn't been voided (Raven decision 22d823b40cb3, Jordan Okafor). Labels still waiting in another
+    of this merchant's jobs count as used too, and their orders as labelled, so two bulk buys can't overspend the
+    allowance or buy the same order twice. `lock` holds the merchant row until the transaction ends, so two
+    enqueues for one merchant run one after the other."""
+    (plan,) = conn.execute(
+        "SELECT plan FROM merchants WHERE id = %s" + (" FOR UPDATE" if lock else ""),
         (merchant_id,),
     ).fetchone()
+    (used,) = conn.execute(USED_THIS_MONTH, (merchant_id,)).fetchone()
     queued = conn.execute(
         "SELECT i.order_id FROM bulk_label_job_items i JOIN bulk_label_jobs j ON j.id = i.job_id "
         "WHERE j.merchant_id = %s AND i.status = 'pending'",
@@ -143,9 +152,6 @@ def record_outcome(conn, job_id: int, position: int, merchant_id: str, outcome: 
             (outcome.order_id, outcome.carrier, outcome.tracking_number, outcome.price, outcome.pdf_url,
              idempotency_key(str(job_id), outcome.order_id)),
         ).fetchone()
-        conn.execute(
-            "UPDATE merchants SET labels_this_month = labels_this_month + 1 WHERE id = %s", (merchant_id,)
-        )
         status, error = "bought", None
     elif isinstance(outcome, StaleRateError):
         label_id, status, error = None, "needs_approval", None

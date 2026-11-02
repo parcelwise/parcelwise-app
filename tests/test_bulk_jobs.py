@@ -105,14 +105,22 @@ def test_worker_paces_every_purchase(monkeypatch):
 
 
 class FakeConn:
-    """Answers the three queries _plan makes: the merchant, orders waiting in other jobs, live labels."""
+    """Answers the queries _plan makes: the merchant's plan, labels used this month, orders waiting in other
+    jobs, live labels."""
 
     def __init__(self, *, plan, used, queued, labelled):
-        self.answers = {"FROM merchants": [(plan, used)], "FROM bulk_label_job_items": queued, "FROM labels": labelled}
+        self.answers = {
+            "FROM merchants": [(plan,)],
+            "count(*)": [(used,)],
+            "FROM bulk_label_job_items": queued,
+            "FROM labels": labelled,
+        }
+        self.params = []
         self.sql = []
 
     def execute(self, sql, params=()):
         self.sql.append(sql)
+        self.params.append(params)
         rows = next(rows for key, rows in self.answers.items() if key in sql)
         return type("Cursor", (), {"fetchone": lambda _: rows[0], "fetchall": lambda _: rows})()
 
@@ -136,3 +144,23 @@ def test_enqueue_locks_the_merchant_row_but_preview_does_not():
     result = bulk_jobs.enqueue(conn, "m1", [selection("a")])
     assert "FOR UPDATE" in conn.sql[0]
     assert result["jobId"] == 9 and result["toBuy"] == ["a"]
+
+
+def test_used_this_month_counts_every_live_label_bought_this_calendar_month():
+    # Single and bulk labels both live in the labels table; voided ones don't count (decision 22d823b40cb3).
+    conn = FakeConn(plan="free", used=49, queued=[], labelled=[])
+    plan = bulk_jobs.preview(conn, "m1", [selection("a"), selection("b")])
+    used_sql = next(sql for sql in conn.sql if "count(*)" in sql)
+    assert "FROM labels" in used_sql
+    assert "voided_at IS NULL" in used_sql
+    assert "date_trunc('month', now())" in used_sql
+    assert "labels_this_month" not in " ".join(conn.sql)
+    assert plan["toBuy"] == ["a"] and plan["overAllowance"] == ["b"]
+
+
+def test_a_bought_label_is_not_also_added_to_a_counter():
+    conn = FakeConn(plan="free", used=0, queued=[], labelled=[])
+    conn.answers = {"INSERT INTO labels": [(5,)], "UPDATE bulk_label_job_items": []}
+    label = bulk_jobs.Label("a", "usps", "9400", bulk_jobs.Decimal("5.40"), "https://x")
+    bulk_jobs.record_outcome(conn, 7, 0, "m1", label)
+    assert not any("labels_this_month" in sql for sql in conn.sql)
