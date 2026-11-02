@@ -1,6 +1,6 @@
-"""Assistant charges through the nightly job. The rate, allowance, start month, exemptions and App Store rule
-are open (Raven task afdabadc60bd); these tests fill them with stand-in values to test the mechanism,
-and check that the shipped config posts nothing while any of them is open."""
+"""Assistant charges through the nightly job, with the values decided in Raven task afdabadc60bd. One input is
+still open (the exempt merchant's id); the tests check that the shipped config posts nothing while it is, and fill
+it with a stand-in to test the mechanism."""
 
 from dataclasses import replace
 from decimal import Decimal
