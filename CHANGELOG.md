@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Assistant usage metered on Starter and Growth: 200 and 1,000 answers a month included, then $0.04 an answer, on the
+  next invoice from December 2026 usage. Billed on completed answers, not attempts. Posts nothing until every
+  billing input is decided; App Store installs are not charged through Stripe.
+- Plan page shows assistant answers against the allowance, with the per-answer price.
+
 ## 0.34.0 (2026-10-21)
 
 - The Parcelwise Assistant answers questions about orders, labels and the plan; Starter and Growth (#49, #55, #62)

@@ -41,6 +41,9 @@ Ask ──▶ app/assistant ──▶ model                 purchases, answers �
 - Charges post through the nightly billing job, as Stripe invoice items; nothing charges at purchase time
   ([ADR 0006](adr/0006-charges-post-through-the-nightly-job.md)).
 - Every charge is idempotent ([ADR 0007](adr/0007-every-charge-is-idempotent.md)).
+- The assistant is billed on completed answers (`assistant_answers` in `usage_daily`), never on attempts; the
+  `assistant` count is every attempt and tracks model cost. Merchants who installed from the Shopify App Store are
+  never charged through Stripe.
 
 ## Background work
 
