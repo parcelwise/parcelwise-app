@@ -32,12 +32,15 @@ class Metered:
     allowance_key: str  # the plan key for what the subscription includes
     price_key: str  # the plan key for the price past the allowance
     starts: str | Undecided | None = None  # first billed period, "YYYY-MM"; None means no start limit
-    # merchant id -> the last period it is exempt for ("YYYY-MM"), or None for no end
-    exempt: dict[str, str | None] | Undecided = field(default_factory=dict)
+    # merchant id -> the last period it is exempt for ("YYYY-MM"), or None for no end. A key may be Undecided
+    # while a merchant's id is not known yet.
+    exempt: dict[str | Undecided, str | None] | Undecided = field(default_factory=dict)
     app_store: str | Undecided = CHARGE  # CHARGE or SKIP for merchants who installed from the App Store
 
     def open_inputs(self) -> list[Undecided]:
         values = [self.usage_feature, self.starts, self.exempt, self.app_store]
+        if isinstance(self.exempt, dict):
+            values += list(self.exempt) + list(self.exempt.values())
         for plan in PLANS.values():
             values += [plan[self.allowance_key], plan[self.price_key]]
         unique = []
@@ -46,6 +49,8 @@ class Metered:
                 unique.append(value)
         return unique
 
+
+BLOOM_AND_CO = Undecided("Bloom & Co's merchant id (merchants.id); not in the repo", "a database lookup")
 
 METERED = {
     "labels": Metered("labels", "labels", "labels_per_month", "extra_label_price"),
@@ -57,10 +62,9 @@ METERED = {
         price_key="extra_assistant_answer_price",
         # December usage, on the January invoice: a full month of the count on the Plan page first (Marcus).
         starts="2026-12",
-        # Bloom & Co only, until their order form renews in February (Sam). Their merchant id and the last exempt
-        # billing month are still needed; until then the assistant posts nothing for anyone.
-        exempt=Undecided("What is Bloom & Co's merchant id, and which billing month is the last one they are "
-                         "exempt for (order form renews in February)?", "Sam Rivera"),
+        # Bloom & Co only (Sam), free through January 2027; February usage is charged because the renewal drops
+        # the all-features wording (Priya). Until their merchant id is filled in, the assistant posts nothing.
+        exempt={BLOOM_AND_CO: "2027-01"},
         # Never through Stripe for an App Store install; they are charged through Shopify Billing (Theo), which
         # is not built yet, so this job skips them.
         app_store=SKIP,

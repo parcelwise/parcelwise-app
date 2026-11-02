@@ -27,6 +27,10 @@ def is_undecided(value) -> bool:
 
 
 ASSISTANT_PRICE = Decimal("0.04")  # per answer past the allowance, Starter and Growth (Priya, Raven task afdabadc60bd)
+# App Store installs pay through a Shopify Billing usage charge, never Stripe (Theo). Its cap per merchant per
+# 30-day cycle starts here; Shopify needs the merchant to approve a higher one, so raise it only on request (Theo).
+# The Shopify Billing path that uses it is not built yet.
+SHOPIFY_ASSISTANT_USAGE_CAP = Decimal("50.00")
 
 PLANS = {
     "free": {

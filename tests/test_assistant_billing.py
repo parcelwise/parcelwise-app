@@ -9,7 +9,7 @@ import pytest
 
 from app.billing import plans
 from app.billing.charges import Charge
-from app.billing.nightly import METERED, SKIP, charges_for, ready, run, waiting
+from app.billing.nightly import BLOOM_AND_CO, METERED, SKIP, charges_for, ready, run, waiting
 from app.usage.daily import ASSISTANT_ANSWERS
 from tests.test_charges import FakeStripe
 from tests.test_nightly import FakePostedTable
@@ -22,7 +22,7 @@ PRICE = Decimal("0.04")  # Priya's rate
 
 @pytest.fixture
 def decided():
-    """The assistant with its one open input (Bloom & Co's id and last exempt month) filled in by a stand-in,
+    """The assistant with its one open input (Bloom & Co's merchant id) filled in by a stand-in,
     and an earlier start so June test data bills."""
     assistant = replace(METERED["assistant"], starts="2026-06", exempt={"bloom": "2026-07", "forever": None})
     return {"labels": METERED["labels"], "assistant": assistant}
@@ -30,8 +30,15 @@ def decided():
 
 def test_shipped_config_bills_no_assistant_while_inputs_are_open():
     assert "assistant" not in ready() and "labels" in ready()
-    owners = {value.owner for value in waiting()["assistant"]}
-    assert owners == {"Sam Rivera"}
+    assert waiting()["assistant"] == [BLOOM_AND_CO]
+
+
+def test_bloom_and_co_free_through_january_2027():
+    assert METERED["assistant"].exempt == {BLOOM_AND_CO: "2027-01"}
+
+
+def test_shopify_usage_cap_is_fifty_dollars():
+    assert plans.SHOPIFY_ASSISTANT_USAGE_CAP == Decimal("50.00")
 
 
 def test_first_billed_month_is_december_and_app_store_installs_never_go_through_stripe():
