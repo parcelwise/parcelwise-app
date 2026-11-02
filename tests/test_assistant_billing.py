@@ -32,7 +32,7 @@ def decided():
 def test_shipped_config_bills_no_assistant_while_inputs_are_open():
     assert "assistant" not in ready() and "labels" in ready()
     owners = {value.owner for value in waiting()["assistant"]}
-    assert owners == {"Priya Shah", "Marcus Lee", "Theo Grant"}
+    assert owners == {"Sam Rivera", "Marcus Lee", "Theo Grant"}
 
 
 def test_starter_includes_200_answers_and_growth_1000():

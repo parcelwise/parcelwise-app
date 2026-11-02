@@ -56,7 +56,7 @@ METERED = {
         price_key="extra_assistant_answer_price",
         starts=Undecided("Which month is the first one we charge assistant usage for?", "Marcus Lee"),
         exempt=Undecided("Which merchants are exempt from assistant charges (Bloom & Co, anyone else)?",
-                         "Priya Shah"),
+                         "Sam Rivera"),
         app_store=Undecided("Do App Store installs get assistant charges through Stripe, or not for now?",
                             "Theo Grant"),
     ),
