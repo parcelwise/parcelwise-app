@@ -68,7 +68,7 @@ export function OrdersTable({
             {bulk && (
               <th>
                 <input
-                type="checkbox"
+                  type="checkbox"
                   aria-label="Select all on this page"
                   checked={allOnPage}
                   onChange={togglePage}
