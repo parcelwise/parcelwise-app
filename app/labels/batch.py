@@ -11,7 +11,7 @@ Decisions this follows (Raven task 444e8aaa568e):
 - Labels that bought are kept; failures are reported and the merchant can retry them (Jordan Okafor, d0d3c77d4339).
 - At most 500 orders per batch (Lena Park, 21777abe92a1).
 - An order that is no longer unfulfilled when the batch is created is dropped and listed; the rest are bought
-  (Jordan Okafor, fd71f63d5869).
+  (Jordan Okafor, fd71f63d5869). The worker checks again just before buying each one (Jordan Okafor, 9463e2f6e872).
 - A merchant retry gets a new idempotency key, except after a carrier timeout, which reuses the last key so a label
   the carrier did issue comes back instead of being bought twice (Priya Shah, 8b0453dcb636; Jordan Okafor,
   271f3d26c255). A timed-out order is retried at its original price; if that quote has expired, the merchant is
@@ -128,8 +128,16 @@ def timed_out_retry(requested: BatchItem, original: BatchItem) -> BatchItem | No
     return BatchItem(requested.order, original.rate, original.shown_price)
 
 
-def run_item(batch_id: str, item: BatchItem, *, attempt: int, has_live_label: bool) -> ItemOutcome:
-    """Buy the label for one order of a batch. The only way a batch buys anything."""
+def run_item(
+    batch_id: str, item: BatchItem, *, attempt: int, has_live_label: bool, still_unfulfilled: bool = True
+) -> ItemOutcome:
+    """Buy the label for one order of a batch. The only way a batch buys anything.
+
+    `still_unfulfilled` is the order's status just before buying: a batch can run for minutes, and an order fulfilled
+    or cancelled meanwhile is skipped like one that changed before the batch started (Jordan Okafor, 9463e2f6e872).
+    """
+    if not still_unfulfilled:
+        return ItemOutcome(NO_LONGER_UNFULFILLED)
     if has_live_label:
         return ItemOutcome(ALREADY_LABELED)
     try:

@@ -37,9 +37,11 @@ purchase. Stripe webhooks update the merchant's plan.
 
 Buying labels for many orders at once (up to 500) is a job in Postgres (`label_batches`, `label_batch_items`).
 The `label-worker` service (`app/labels/worker.py`, one instance) buys each order through `purchase_label()`,
-at most 40 USPS purchases a minute per merchant account. Before queuing, the whole batch is refused if it would go
+at most 40 USPS purchases a minute per merchant account (on startup the worker counts the last minute's attempts
+from the database, so a restart doesn't reset the limit). Before queuing, the whole batch is refused if it would go
 over the plan's monthly allowance. Orders that already have a live label are skipped for reprint. Orders whose
 quote expires or changes are returned for the merchant to approve the new price, and failures are reported for
-retry; labels that bought are kept. Orders fulfilled or cancelled after they were selected are left out and listed.
-If the carrier times out, a retry reuses the same idempotency key at the original price, so a label the carrier
-already issued is returned rather than bought again; if that quote has expired, the merchant approves a new price.
+retry; labels that bought are kept. Orders fulfilled or cancelled after they were selected, or while the batch
+runs, are left out and listed. If the carrier times out, a retry reuses the same idempotency key at the original
+price, so a label the carrier already issued is returned rather than bought again; if that quote has expired, the
+merchant approves a new price.

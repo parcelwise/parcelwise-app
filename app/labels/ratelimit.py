@@ -2,6 +2,7 @@
 
 import time
 from collections import defaultdict, deque
+from collections.abc import Iterable
 
 from app.labels.carriers import PURCHASES_PER_MINUTE
 
@@ -26,6 +27,17 @@ class PurchaseRateLimiter:
         if len(sent) < limit:
             return 0.0
         return WINDOW_SECONDS - (now - sent[0])
+
+    def seed(self, merchant_id: str, carrier: str, seconds_ago: Iterable[float]) -> None:
+        """Purchases sent before this process started, so a restart doesn't reset the limit (Ana Ruiz, Raven
+        6e7bb36f0dd0)."""
+        if carrier not in self.limits:
+            return
+        now = self.clock()
+        sent = self._sent[(merchant_id, carrier)]
+        for age in sorted(seconds_ago, reverse=True):
+            if 0 <= age < WINDOW_SECONDS:
+                sent.append(now - age)
 
     def record(self, merchant_id: str, carrier: str) -> None:
         if carrier in self.limits:

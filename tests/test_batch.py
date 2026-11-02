@@ -161,3 +161,10 @@ def test_fulfilled_and_cancelled_orders_are_reported_as_closed():
 
     conn = _Orders([("o0", "unfulfilled"), ("o1", "fulfilled"), ("o2", "cancelled")])
     assert _closed_order_ids(conn, "bloom", ["o0", "o1", "o2"]) == {"o1", "o2"}
+
+
+def test_order_closed_while_the_batch_ran_is_skipped_not_bought(fake, fresh_rate):
+    item = BatchItem(FakeOrder("o1"), fresh_rate, Decimal("5.40"))
+    outcome = run_item("b1", item, attempt=1, has_live_label=False, still_unfulfilled=False)
+    assert outcome.status == "no_longer_unfulfilled"
+    assert fake.bought == []

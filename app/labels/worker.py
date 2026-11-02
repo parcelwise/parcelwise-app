@@ -4,9 +4,12 @@ Runs as a single instance (infra/deploy.yaml), so the in-process rate limiter co
 A crash between buying and committing leaves the item queued with its attempt count unchanged, so the next run
 reuses that attempt's idempotency key and the carrier returns the same label instead of buying another. A carrier
 timeout also keeps the attempt count, so the merchant's retry reuses the key (Jordan Okafor, Raven 271f3d26c255).
+On startup it loads the last minute of purchase attempts from the database, so a restart doesn't reset the rate
+limit (Ana Ruiz, Raven 6e7bb36f0dd0).
 """
 
 import time
+from collections import defaultdict
 
 from app.labels.batch import BOUGHT, BatchItem, _live_label_order_ids, batch_idempotency_key, run_item
 from app.labels.ratelimit import PurchaseRateLimiter
@@ -32,6 +35,27 @@ def _claim(conn, limiter: PurchaseRateLimiter):
     return None, (min(waits) if waits else IDLE_SECONDS)
 
 
+def _still_unfulfilled(conn, order_id: str) -> bool:
+    rows = conn.execute("SELECT status FROM orders WHERE id = %s", (order_id,)).fetchall()
+    return bool(rows) and rows[0][0] == "unfulfilled"
+
+
+def seed_limiter(conn, limiter: PurchaseRateLimiter) -> None:
+    """Count each account's purchase attempts from the last minute, recorded before this process started.
+
+    An item's updated_at is when its last attempt finished; needs_requote is counted too, which can only over-count.
+    """
+    rows = conn.execute(
+        "SELECT merchant_id, carrier, EXTRACT(EPOCH FROM now() - updated_at) FROM label_batch_items "
+        "WHERE status IN ('bought', 'failed', 'needs_requote') AND updated_at > now() - interval '60 seconds'"
+    ).fetchall()
+    ages = defaultdict(list)
+    for merchant_id, carrier, seconds_ago in rows:
+        ages[(merchant_id, carrier)].append(float(seconds_ago))
+    for (merchant_id, carrier), seconds in ages.items():
+        limiter.seed(merchant_id, carrier, seconds)
+
+
 def work_once(conn, *, load_order, limiter: PurchaseRateLimiter) -> float:
     """Buy at most one queued item. Returns how long to sleep before the next call (0 means go again now)."""
     row, wait = _claim(conn, limiter)
@@ -42,10 +66,13 @@ def work_once(conn, *, load_order, limiter: PurchaseRateLimiter) -> float:
     # `attempts` counts finished attempts and is bumped in this same transaction, so a crash reuses this attempt's key.
     # A timeout doesn't finish the attempt: the carrier may have issued the label, so the retry must reuse the key.
     attempt = attempts + 1
+    still_unfulfilled = _still_unfulfilled(conn, order_id)
     has_live_label = bool(_live_label_order_ids(conn, [order_id]))
-    if not has_live_label:
+    if still_unfulfilled and not has_live_label:
         limiter.record(merchant_id, carrier)
-    outcome = run_item(batch_id, item, attempt=attempt, has_live_label=has_live_label)
+    outcome = run_item(
+        batch_id, item, attempt=attempt, has_live_label=has_live_label, still_unfulfilled=still_unfulfilled
+    )
     if outcome.status == BOUGHT:
         label = outcome.label
         conn.execute(
@@ -81,6 +108,8 @@ def run_forever(transaction, *, load_order, limiter: PurchaseRateLimiter | None 
     """`transaction` is app.core.db.transaction; `load_order(conn, order_id)` returns the order with its merchant's
     carrier accounts, the same loader the single "Buy label" route uses."""
     limiter = limiter or PurchaseRateLimiter()
+    with transaction() as conn:
+        seed_limiter(conn, limiter)
     while True:
         with transaction() as conn:
             wait = work_once(conn, load_order=load_order, limiter=limiter)

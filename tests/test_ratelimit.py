@@ -30,3 +30,9 @@ def test_carriers_without_a_limit_are_not_held():
     for _ in range(100):
         limiter.record("bloom", "ups")
     assert limiter.wait_seconds("bloom", "ups") == 0
+
+
+def test_seeding_ignores_purchases_older_than_a_minute():
+    limiter = PurchaseRateLimiter(limits={"usps": 1}, clock=Clock())
+    limiter.seed("bloom", "usps", [61.0, 60.0])
+    assert limiter.wait_seconds("bloom", "usps") == 0
