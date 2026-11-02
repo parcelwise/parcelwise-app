@@ -6,9 +6,9 @@
 
 <!-- Commands you ran, screenshots for UI changes. -->
 
-## Decisions
+## Decisions behind this change
 
-<!-- Paste what Raven's bridge_pr_summary returns: one table, who made each call and how. -->
+<!-- Replace this heading and comment with what Raven's bridge_pr_summary returns: it brings this heading, one table of who made each call and how, and the legend. -->
 
 ## Checklist
 

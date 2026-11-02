@@ -29,8 +29,8 @@ open) and leave the open values as clearly marked inputs the owner's answer fill
 
 When the mechanism is built and its tests pass, commit on a branch named after the work and open a draft pull
 request with `gh pr create --draft`, following the PR template. Keep the body short: two sentences under **What
-and why**, the commands under **How it was tested**, and under **Decisions** exactly what `bridge_pr_summary`
-returns, nothing more.
+and why**, the commands under **How it was tested**, and as the Decisions section exactly what
+`bridge_pr_summary` returns, nothing more: it brings its own heading, so do not add one above it.
 
 - When someone asks who knows something, or why something was decided, ask Raven (`bridge_ask_raven`) first.
 - Write questions for people in plain English a busy teammate can answer in ten seconds.
