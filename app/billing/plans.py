@@ -2,14 +2,27 @@
 
 A plan's allowance is what the subscription includes. Past it, a plan with an `extra_label_price` keeps buying
 and pays per label on the next invoice (app/billing/nightly.py); a plan without one stops.
+
+Assistant answers are metered on Starter and Growth (Priya, founders sync 2026-10-29); Free has no assistant.
+`assistant_answers_per_month` and `assistant_answer_price` are OPEN: Priya sets them (Raven 72f33c629161,
+62764143a611). While either is None the nightly job charges nothing for the assistant.
 """
 
 from decimal import Decimal
 
 PLANS = {
-    "free": {"labels_per_month": 50, "assistant": False, "extra_label_price": None},
-    "starter": {"labels_per_month": 1_000, "assistant": True, "extra_label_price": Decimal("0.08")},
-    "growth": {"labels_per_month": None, "assistant": True, "extra_label_price": None},
+    "free": {
+        "labels_per_month": 50, "assistant": False, "extra_label_price": None,
+        "assistant_answers_per_month": None, "assistant_answer_price": None,  # no assistant on Free
+    },
+    "starter": {
+        "labels_per_month": 1_000, "assistant": True, "extra_label_price": Decimal("0.08"),
+        "assistant_answers_per_month": None, "assistant_answer_price": None,  # OPEN: Priya
+    },
+    "growth": {
+        "labels_per_month": None, "assistant": True, "extra_label_price": None,
+        "assistant_answers_per_month": None, "assistant_answer_price": None,  # OPEN: Priya
+    },
 }
 
 

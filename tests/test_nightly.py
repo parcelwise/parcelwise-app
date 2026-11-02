@@ -1,7 +1,10 @@
 from datetime import date
 from decimal import Decimal
 
-from app.billing.nightly import charges_for, closed_period, run
+import pytest
+
+from app.billing import nightly
+from app.billing.nightly import METERED, Metered, charges_for, closed_period, run
 from tests.test_charges import FakePosted, FakeStripe
 from tests.test_usage_daily import FakeUsage, rows_for
 
@@ -65,3 +68,90 @@ def test_charges_post_in_batches_of_one_hundred():
     assert BATCH == 100
     assert run(usage, plan_of, customer_of, FakeStripe, posted, period="2026-06") == 250
     assert posted.transactions == 3
+
+
+# Assistant answers. The rates and allowances here are test values, not prices: the real ones are open.
+TEST_ASSISTANT = {"assistant_answers_per_month": 100, "assistant_answer_price": Decimal("0.10")}
+
+
+def assistant_rule(**overrides):
+    fields = {"starts": "2026-06", "exempt_shops": frozenset({"exempt.myshopify.com"}), "bill_app_store": False}
+    fields.update(overrides)
+    return {"labels": METERED["labels"], "assistant": Metered("assistant_answers_per_month",
+                                                              "assistant_answer_price", **fields)}
+
+
+@pytest.fixture
+def priced(monkeypatch):
+    for name in ("starter", "growth"):
+        monkeypatch.setitem(nightly.PLANS, name, {**nightly.PLANS[name], **TEST_ASSISTANT})
+
+
+SHOP_OF = {"m1": "one.myshopify.com", "m3": "three.myshopify.com", "mx": "exempt.myshopify.com"}
+SOURCE_OF = {"m1": "direct", "m3": "direct", "mx": "direct"}
+PLANS_OF = {**PLAN_OF, "mx": "growth"}
+
+
+def assistant_charges(totals, period="2026-06", **kwargs):
+    kwargs.setdefault("shop_of", SHOP_OF)
+    kwargs.setdefault("source_of", SOURCE_OF)
+    kwargs.setdefault("metered", assistant_rule())
+    return [(c.merchant_id, c.feature, c.quantity, c.unit_price)
+            for c in charges_for(period, totals, PLANS_OF, **kwargs)]
+
+
+def test_assistant_charges_nothing_while_its_open_inputs_are_unset(priced):
+    assert not METERED["assistant"].ready()
+    FakeStripe.InvoiceItem.created.clear()
+    usage = FakeUsage(rows_for(["m1"], range(1, 31), feature="assistant", count=50))
+    assert run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, FakePostedTable(), period="2026-06",
+               shop_of=SHOP_OF, source_of=SOURCE_OF) == 0
+    assert usage.reads == 1  # one page of labels; the assistant is not even read
+    assert FakeStripe.InvoiceItem.created == []
+
+
+def test_assistant_unpriced_plans_charge_nothing():
+    assert assistant_charges({("m1", "assistant"): 5_000}) == []
+
+
+def test_starter_and_growth_pay_past_the_allowance(priced):
+    totals = {("m1", "assistant"): 130, ("m3", "assistant"): 101, ("m2", "assistant"): 500}
+    assert assistant_charges(totals) == [
+        ("m1", "assistant", 30, Decimal("0.10")),
+        ("m3", "assistant", 1, Decimal("0.10")),
+    ]
+
+
+def test_no_assistant_charge_before_the_start_month(priced):
+    assert assistant_charges({("m1", "assistant"): 500}, period="2026-05") == []
+
+
+def test_exempt_shops_and_unknown_shops_are_not_charged(priced):
+    totals = {("mx", "assistant"): 500, ("m3", "assistant"): 500}
+    assert assistant_charges(totals, shop_of={"mx": "exempt.myshopify.com"}) == []
+
+
+def test_app_store_installs_and_unknown_sources_are_skipped_when_not_billed_through_stripe(priced):
+    totals = {("m1", "assistant"): 500, ("m3", "assistant"): 500}
+    assert assistant_charges(totals, source_of={"m1": "app_store"}) == []
+    assert assistant_charges(totals, source_of={"m1": "app_store", "m3": "app_store"},
+                             metered=assistant_rule(bill_app_store=True)) == [
+        ("m1", "assistant", 400, Decimal("0.10")),
+        ("m3", "assistant", 400, Decimal("0.10")),
+    ]
+
+
+def test_assistant_charges_post_through_the_nightly_job_once(priced):
+    FakeStripe.InvoiceItem.created.clear()
+    usage = FakeUsage(rows_for(["m1"], range(1, 31), feature="assistant", count=5))  # 150 answers
+    posted = FakePostedTable()
+    for _ in range(2):
+        run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, posted, period="2026-06",
+            shop_of=SHOP_OF, source_of=SOURCE_OF, metered=assistant_rule())
+    (created,) = FakeStripe.InvoiceItem.created
+    assert created["amount"] == 500 and created["idempotency_key"] == "m1:assistant:2026-06"
+
+
+def test_labels_are_charged_as_before_whatever_the_assistant_inputs():
+    totals = {("m1", "labels"): 1_212}
+    assert charges_for("2026-06", totals, PLAN_OF) == charges_for("2026-06", totals, PLAN_OF, metered=assistant_rule())
