@@ -9,6 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Callable
 
+from app.core import config
 from app.labels.bulk import AlreadyLabelled, BulkItem, BulkPlan, buy_all, idempotency_key, plan_bulk
 from app.labels.purchase import Label, StaleRateError
 from app.labels.rates import Rate
@@ -22,6 +23,16 @@ USED_THIS_MONTH = (
     "SELECT count(*) FROM labels l JOIN orders o ON o.id = l.order_id "
     "WHERE o.merchant_id = %s AND l.voided_at IS NULL AND l.created_at >= date_trunc('month', now())"
 )
+
+
+class BulkBuyingOff(Exception):
+    """Bulk label buying is switched off on this server (settings.bulk_label_buying)."""
+
+
+def _require_bulk_buying() -> None:
+    # Refuse rather than queue a job no worker will run: a queued job holds its orders and allowance.
+    if not config.settings.bulk_label_buying:
+        raise BulkBuyingOff("bulk label buying is switched off")
 
 
 @dataclass(frozen=True)
@@ -94,11 +105,13 @@ def plan_json(plan: BulkPlan) -> dict:
 
 def preview(conn, merchant_id: str, selections: list[Selection]) -> dict:
     """What the confirm step shows: what will be bought and its total, what's already labelled, what's over."""
+    _require_bulk_buying()
     return plan_json(_plan(conn, merchant_id, selections))
 
 
 def enqueue(conn, merchant_id: str, selections: list[Selection]) -> dict:
     """Re-plan on the server, then queue only what will be bought. Returns the job id and that plan."""
+    _require_bulk_buying()
     job_id, plan = _enqueue(conn, merchant_id, selections)
     return {"jobId": job_id, **plan_json(plan)}
 

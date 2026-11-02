@@ -18,6 +18,10 @@ class Settings:
     sentry_dsn: str = field(default_factory=lambda: _env("SENTRY_DSN"))
     release: str = field(default_factory=lambda: _env("GIT_SHA", "local"))
 
+    # Bulk label buying stays off until the label-worker is deployed and quotes are stored on the server
+    # (Raven decision a8ed86add40e, Jordan Okafor). Set BULK_LABEL_BUYING=true to turn it on.
+    bulk_label_buying: bool = field(default_factory=lambda: _env("BULK_LABEL_BUYING", "false").lower() == "true")
+
     @property
     def is_production(self) -> bool:
         return self.env == "production"

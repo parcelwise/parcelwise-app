@@ -1,13 +1,22 @@
 """The worker's job loop, with an in-memory stand-in for the job tables. No database."""
 
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import pytest
+
+from app.core import config
 from app.labels import bulk_jobs, carriers, worker
 from app.labels.bulk_jobs import Selection
 from app.labels.carriers import CarrierError
 from tests.conftest import FakeCarrier, FakeOrder
+
+
+@pytest.fixture(autouse=True)
+def bulk_on(monkeypatch):
+    monkeypatch.setattr(config, "settings", replace(config.settings, bulk_label_buying=True))
 
 
 class FailsOn(FakeCarrier):
@@ -164,3 +173,20 @@ def test_a_bought_label_is_not_also_added_to_a_counter():
     label = bulk_jobs.Label("a", "usps", "9400", bulk_jobs.Decimal("5.40"), "https://x")
     bulk_jobs.record_outcome(conn, 7, 0, "m1", label)
     assert not any("labels_this_month" in sql for sql in conn.sql)
+
+
+def test_bulk_buying_is_off_by_default(monkeypatch):
+    monkeypatch.delenv("BULK_LABEL_BUYING", raising=False)
+    assert config.Settings().bulk_label_buying is False
+    monkeypatch.setenv("BULK_LABEL_BUYING", "true")
+    assert config.Settings().bulk_label_buying is True
+
+
+def test_preview_and_enqueue_refuse_while_bulk_buying_is_off(monkeypatch):
+    monkeypatch.setattr(config, "settings", replace(config.settings, bulk_label_buying=False))
+    conn = FakeConn(plan="growth", used=0, queued=[], labelled=[])
+    with pytest.raises(bulk_jobs.BulkBuyingOff):
+        bulk_jobs.preview(conn, "m1", [selection("a")])
+    with pytest.raises(bulk_jobs.BulkBuyingOff):
+        bulk_jobs.enqueue(conn, "m1", [selection("a")])
+    assert conn.sql == []  # nothing read, nothing queued
