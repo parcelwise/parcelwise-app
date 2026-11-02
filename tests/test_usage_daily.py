@@ -60,3 +60,25 @@ def test_month_to_date_is_one_merchant_this_month():
         "assistant": 10,
         "labels": 18,
     }
+
+
+def test_day_counts_keep_attempts_and_add_completed_answers_per_request():
+    from app.usage.daily import ASSISTANT_ANSWERS, day_counts
+    from app.usage.events import UsageEvent
+
+    events = [
+        UsageEvent("m1", "assistant", "q1", status="timed_out", attempt=1),
+        UsageEvent("m1", "assistant", "q1", status="completed", attempt=2),  # retried, answered once
+        UsageEvent("m1", "assistant", "q2", status="failed"),  # never answered
+        UsageEvent("m1", "assistant", "q3", status="completed"),
+        UsageEvent("m2", "assistant", "q4", status="timed_out", attempt=1),
+        UsageEvent("m2", "assistant", "q4", status="timed_out", attempt=2),  # gave up
+        UsageEvent("m1", "labels", "l1"),
+        UsageEvent("m1", "labels", "l2", status="voided"),
+    ]
+    assert day_counts(events) == {
+        ("m1", "assistant"): 4,
+        ("m2", "assistant"): 2,
+        ("m1", "labels"): 1,
+        ("m1", ASSISTANT_ANSWERS): 2,
+    }

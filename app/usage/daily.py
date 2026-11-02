@@ -11,6 +11,11 @@ from datetime import date
 
 PAGE = 500
 
+# A count usage_daily holds that no event reports directly: completed assistant answers, one per request id.
+# `assistant` counts every attempt and is what the model cost us (#216); this is what the merchant got and what
+# billing reads (Jordan, Raven task afdabadc60bd).
+ASSISTANT_ANSWERS = "assistant_answers"
+
 
 @dataclass(frozen=True, order=True)
 class Cursor:
@@ -49,6 +54,21 @@ def period_totals(usage, period: str, *, features) -> dict[tuple[str, str], int]
             if after is None:
                 break
     return dict(totals)
+
+
+def day_counts(events) -> dict[tuple[str, str], int]:
+    """{(merchant_id, feature): count} for one day of usage events, as the rollup computes it in SQL
+    (app/usage/store.py): every attempt except voids per feature, plus completed assistant answers per request id."""
+    counts: dict[tuple[str, str], int] = defaultdict(int)
+    answered: set[tuple[str, str]] = set()
+    for event in events:
+        if event.status != "voided":
+            counts[(event.merchant_id, event.feature)] += 1
+        if event.feature == "assistant" and event.status == "completed":
+            answered.add((event.merchant_id, event.request_id))
+    for merchant_id, _ in answered:
+        counts[(merchant_id, ASSISTANT_ANSWERS)] += 1
+    return dict(counts)
 
 
 def rollup(usage, day: date) -> int:

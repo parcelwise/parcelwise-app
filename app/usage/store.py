@@ -3,7 +3,7 @@
 from datetime import date
 
 from app.core.db import transaction
-from app.usage.daily import Cursor, DailyCount
+from app.usage.daily import ASSISTANT_ANSWERS, Cursor, DailyCount
 
 
 class UsageStore:
@@ -26,7 +26,17 @@ class UsageStore:
                 "GROUP BY merchant_id, feature",
                 (day, day, day),
             )
-            return cur.rowcount
+            rows = cur.rowcount
+            # What billing reads for the assistant (Jordan, Raven task afdabadc60bd): one per request id that
+            # completed. Failures, timeouts and retries stay in the `assistant` attempt count only.
+            cur.execute(
+                "INSERT INTO usage_daily (day, merchant_id, feature, count) "
+                "SELECT %s, merchant_id, %s, COUNT(DISTINCT request_id) FROM usage_events "
+                "WHERE at >= %s AND at < %s + INTERVAL '1 day' AND feature = 'assistant' AND status = 'completed' "
+                "GROUP BY merchant_id",
+                (day, ASSISTANT_ANSWERS, day, day),
+            )
+            return rows + cur.rowcount
 
     def daily_after(self, feature: str, period: str, after: Cursor | None, limit: int) -> list[DailyCount]:
         """One page of usage_daily for a feature and a period, ordered by (day, merchant_id, feature)."""

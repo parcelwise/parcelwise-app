@@ -17,7 +17,7 @@ from datetime import date
 from app.billing.charges import Charge, post_charge
 from app.billing.plans import PLANS, Undecided, is_undecided
 from app.shopify.install import APP_STORE
-from app.usage.daily import period_totals
+from app.usage.daily import ASSISTANT_ANSWERS, period_totals
 
 CHARGE = "charge"  # App Store installs are charged through Stripe like everyone else
 SKIP = "skip"  # App Store installs are not charged for this feature
@@ -51,9 +51,7 @@ METERED = {
     # Starter and Growth (Priya, Oct 29); through this job, never at question time (Marcus, Oct 29).
     "assistant": Metered(
         "assistant",
-        usage_feature=Undecided(
-            "Which usage count is billed: completed answers only, or every attempt as usage_daily counts today "
-            "(#216)?", "Jordan Okafor"),
+        usage_feature=ASSISTANT_ANSWERS,  # completed answers, one per request id; not attempts (Jordan)
         allowance_key="assistant_answers_per_month",
         price_key="extra_assistant_answer_price",
         starts=Undecided("Which month is the first one we charge assistant usage for?", "Marcus Lee"),
