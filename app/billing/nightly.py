@@ -15,7 +15,7 @@ from app.billing.charges import Charge, post_charge
 from app.billing.open_calls import Open, is_open
 from app.billing.plans import PLANS
 from app.shopify.install import APP_STORE
-from app.usage.daily import period_totals
+from app.usage.daily import ASSISTANT_ANSWERED, period_totals
 
 
 @dataclass(frozen=True)
@@ -35,8 +35,7 @@ METERED = {
     "assistant": Metered(
         "assistant_answers_per_month",
         "assistant_answer_price",
-        counted_from=Open("75668ac5d832", "What counts as one billable assistant use: a completed answer, or every "
-                                          "model attempt? (usage_daily 'assistant' counts attempts since #216)"),
+        counted_from=ASSISTANT_ANSWERED,  # completed answers only, not attempts (Jordan, Raven 75668ac5d832)
         first_period=Open("22fc5b84721e", "Which month is the first one assistant usage is charged for?"),
         exempt=Open("c5fd81c49082", "Is Bloom & Co excluded from assistant charges, and are any other merchants?"),
         charge_app_store=Open("b9d5a20eb56f", "How are App Store-installed merchants charged for assistant use?"),

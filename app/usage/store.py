@@ -3,7 +3,7 @@
 from datetime import date
 
 from app.core.db import transaction
-from app.usage.daily import Cursor, DailyCount
+from app.usage.daily import ASSISTANT_ANSWERED, Cursor, DailyCount
 
 
 class UsageStore:
@@ -16,7 +16,11 @@ class UsageStore:
             )
 
     def rollup_day(self, day: date) -> int:
-        """Fold one day of usage_events into usage_daily. Re-running a day replaces its rows."""
+        """Fold one day of usage_events into usage_daily. Re-running a day replaces its rows.
+
+        Two assistant counts per day: `assistant`, every attempt (the cost, #216), and `assistant_answered`, one per
+        request id that completed (what is billed). Returns the rows written.
+        """
         with transaction() as cur:
             cur.execute("DELETE FROM usage_daily WHERE day = %s", (day,))
             cur.execute(
@@ -26,7 +30,15 @@ class UsageStore:
                 "GROUP BY merchant_id, feature",
                 (day, day, day),
             )
-            return cur.rowcount
+            rows = cur.rowcount
+            cur.execute(
+                "INSERT INTO usage_daily (day, merchant_id, feature, count) "
+                "SELECT %s, merchant_id, %s, COUNT(DISTINCT request_id) FROM usage_events "
+                "WHERE at >= %s AND at < %s + INTERVAL '1 day' AND feature = 'assistant' AND status = 'completed' "
+                "GROUP BY merchant_id",
+                (day, ASSISTANT_ANSWERED, day, day),
+            )
+            return rows + cur.rowcount
 
     def daily_after(self, feature: str, period: str, after: Cursor | None, limit: int) -> list[DailyCount]:
         """One page of usage_daily for a feature and a period, ordered by (day, merchant_id, feature)."""

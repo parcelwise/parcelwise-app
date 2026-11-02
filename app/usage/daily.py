@@ -11,6 +11,11 @@ from datetime import date
 
 PAGE = 500
 
+# Billable assistant answers: one per question that got a completed answer (Jordan, Raven 75668ac5d832). A retry
+# reuses the request id, so the merchant gets one answer and pays once. The plain `assistant` count stays what it
+# has been since #216: every attempt, the model's cost. Billing reads this one; the rollup writes both.
+ASSISTANT_ANSWERED = "assistant_answered"
+
 
 @dataclass(frozen=True, order=True)
 class Cursor:

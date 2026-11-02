@@ -49,7 +49,8 @@ purchase. Stripe webhooks update the merchant's plan. The usage rollup runs at 0
 at 09:00 UTC (`infra/deploy.yaml`); the billing job posts the closed month's charges on the first and anything
 left behind on the nights after.
 
-The assistant is metered like extra labels: a plan allowance and a price per answer past it, charged by the same
+The assistant is metered like extra labels: a plan allowance and a price per completed answer past it (the rollup
+writes `assistant_answered`, one per request id that completed, beside the attempt count), charged by the same
 nightly job (`METERED` in `app/billing/nightly.py`). A value nobody has decided yet is an `Open` marker
 (`app/billing/open_calls.py`) naming its Raven decision; the job holds every charge that depends on one and logs
 which decision holds it, so nothing charges on a guess.

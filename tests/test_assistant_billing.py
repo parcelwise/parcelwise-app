@@ -1,5 +1,5 @@
-"""Charging for the assistant. Its price, allowance, start month, exemptions, App Store handling and billable
-count are open in Raven; until they are answered, nothing charges for it and label charges carry on as before."""
+"""Charging for the assistant. It bills completed answers, not attempts (Jordan). Its price, allowance, start month,
+exemptions and App Store handling are open in Raven; until they are answered, nothing charges for it and label charges carry on as before."""
 
 from dataclasses import replace
 from decimal import Decimal
@@ -11,6 +11,7 @@ from app.billing.charges import Charge
 from app.billing.nightly import METERED, Held, charges_for, run
 from app.billing.open_calls import is_open
 from app.billing.plans import PLANS
+from app.usage.daily import ASSISTANT_ANSWERED
 from tests.test_charges import FakeStripe
 from tests.test_nightly import FakePostedTable
 from tests.test_usage_daily import FakeUsage, rows_for
@@ -24,7 +25,7 @@ def answered(monkeypatch):
     """Example answers so the mechanism can be exercised. These numbers are test inputs, not decisions."""
 
     def fill(*, allowance=100, price=Decimal("0.02"), first_period="2026-06", exempt=frozenset(),
-             charge_app_store=True, counted_from="assistant"):
+             charge_app_store=True, counted_from=ASSISTANT_ANSWERED):
         plans = {name: dict(plan) for name, plan in PLANS.items()}
         for name in ("starter", "growth"):
             plans[name]["assistant_answers_per_month"] = allowance
@@ -40,7 +41,7 @@ def answered(monkeypatch):
 
 def test_the_open_calls_are_still_open():
     assistant = METERED["assistant"]
-    for value in (assistant.counted_from, assistant.first_period, assistant.exempt, assistant.charge_app_store,
+    for value in (assistant.first_period, assistant.exempt, assistant.charge_app_store,
                   PLANS["starter"]["assistant_answer_price"], PLANS["growth"]["assistant_answers_per_month"]):
         assert is_open(value)
 
@@ -55,12 +56,12 @@ def test_until_answered_nothing_charges_for_the_assistant_and_labels_still_do():
     charges = charges_for("2026-06", totals, PLAN_OF, held=held)
     assert [(c.feature, c.quantity) for c in charges] == [("labels", 212)]
     assert len(held) == 2
-    assert held.by_node == {"75668ac5d832": {("m1", "assistant"), ("m2", "assistant")}}
+    assert held.by_node == {"22fc5b84721e": {("m1", "assistant"), ("m2", "assistant")}}
 
 
 def test_the_nightly_run_posts_labels_and_holds_the_assistant():
     FakeStripe.InvoiceItem.created.clear()
-    usage = FakeUsage(rows_for(["m1"], range(1, 31), count=40) + rows_for(["m1"], [3], feature="assistant", count=9))
+    usage = FakeUsage(rows_for(["m1"], range(1, 31), count=40) + rows_for(["m1"], [3], feature=ASSISTANT_ANSWERED, count=9))
     held = Held()
     assert run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, FakePostedTable(), period="2026-06", held=held) == 1
     assert [c["description"] for c in FakeStripe.InvoiceItem.created] == ["Extra labels, June 2026: 200 × $0.08"]
@@ -109,17 +110,17 @@ def test_app_store_merchants_skipped_when_that_is_the_answer(answered):
     assert charges == []
 
 
-def test_the_billable_count_is_read_from_the_usage_feature_named(answered):
-    answered(counted_from="assistant_answered")
+def test_billing_reads_completed_answers_not_attempts():
+    assert METERED["assistant"].counted_from == ASSISTANT_ANSWERED
     usage = FakeUsage(rows_for(["m1"], [1], feature="assistant", count=500)
-                      + rows_for(["m1"], [1], feature="assistant_answered", count=120))
+                      + rows_for(["m1"], [1], feature=ASSISTANT_ANSWERED, count=120))
     assert nightly.billable_totals(usage, "2026-06")[("m1", "assistant")] == 120
 
 
 def test_rerunning_posts_the_assistant_charge_once(answered):
     answered()
     FakeStripe.InvoiceItem.created.clear()
-    usage = FakeUsage(rows_for(["m1"], range(1, 11), feature="assistant", count=20))  # 200 answers
+    usage = FakeUsage(rows_for(["m1"], range(1, 11), feature=ASSISTANT_ANSWERED, count=20))  # 200 answers
     posted = FakePostedTable()
     assert run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, posted, period="2026-06") == 1
     assert run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, posted, period="2026-06") == 0
