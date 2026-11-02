@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+# OPEN, Marcus Lee (Raven: "What does the assistant line on the invoice say?"): the assistant's wording goes
+# here. Until then its line reads "assistant, <Month YYYY>: …"; no assistant charge posts before then anyway.
 FEATURE_LABEL = {"labels": "Extra labels"}
 
 
