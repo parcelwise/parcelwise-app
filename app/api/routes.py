@@ -7,4 +7,7 @@ ROUTES = {
     ("POST", "/webhooks/stripe"): "app.billing.stripe_webhooks:handle_event",
     ("POST", "/webhooks/shopify"): "app.shopify.webhooks:verify",
     ("GET", "/api/orders/search"): "app.orders.queries:search_orders",
+    ("GET", "/api/orders/unfulfilled-ids"): "app.orders.queries:unfulfilled_order_ids",
+    ("POST", "/api/label-batches"): "app.labels.batch_store:create_label_batch",
+    ("GET", "/api/label-batches/{batch_id}"): "app.labels.batch_store:get_label_batch",
 }

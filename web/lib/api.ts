@@ -28,3 +28,54 @@ export const buyLabel = (orderId: string, rateId: string, shownPrice: string) =>
   });
 
 export const searchOrders = (q: string) => call<Order[]>(`/orders/search?q=${encodeURIComponent(q)}`);
+
+// Bulk label purchases. The server buys one label per order in a background job and reports each order's outcome.
+export type BatchSelection = {
+  orderId: string;
+  carrier: string;
+  service: string;
+  rateId: string;
+  price: string;
+  quotedAt: string;
+};
+
+export type BatchItemStatus =
+  | "queued"
+  | "bought"
+  | "failed"
+  | "already_labeled"
+  | "over_allowance"
+  | "needs_price_approval";
+
+export type BatchItem = {
+  orderId: string;
+  position: number;
+  carrier: string;
+  service: string;
+  price: string;
+  status: BatchItemStatus;
+  trackingNumber: string;
+  error: string;
+};
+
+export type LabelBatch = { batchId: number; status?: "queued" | "running" | "done"; items: BatchItem[] };
+
+export const listUnfulfilledOrderIds = () => call<string[]>("/orders/unfulfilled-ids");
+
+export const createLabelBatch = (selections: BatchSelection[]) =>
+  call<LabelBatch>("/label-batches", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      selections: selections.map((s) => ({
+        order_id: s.orderId,
+        carrier: s.carrier,
+        service: s.service,
+        rate_id: s.rateId,
+        price: s.price,
+        quoted_at: s.quotedAt,
+      })),
+    }),
+  });
+
+export const getLabelBatch = (batchId: number) => call<LabelBatch>(`/label-batches/${batchId}`);
