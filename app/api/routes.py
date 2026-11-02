@@ -8,5 +8,5 @@ ROUTES = {
     ("POST", "/webhooks/shopify"): "app.shopify.webhooks:verify",
     ("GET", "/api/orders/search"): "app.orders.queries:search_orders",
     ("POST", "/api/assistant/ask"): "app.assistant.chat:ask",
-    ("GET", "/api/usage"): "app.usage.daily:month_to_date",
+    ("GET", "/api/usage"): "app.billing.plan_usage:plan_usage",
 }

@@ -43,6 +43,12 @@ export const askAssistant = (question: string) =>
     body: JSON.stringify({ question }),
   });
 
-export type UsageThisMonth = { labels: number; assistant: number; labelsAllowance: number | null };
+export type UsageThisMonth = {
+  labels: number;
+  labelsAllowance: number | null;
+  assistantAnswers: number;
+  assistantAllowance: number | null;
+  assistantPrice: string | null;
+};
 
 export const usageThisMonth = () => call<UsageThisMonth>("/usage");
