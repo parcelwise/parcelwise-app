@@ -17,7 +17,7 @@ from tests.test_usage_daily import FakeUsage, rows_for
 
 PLAN_OF = {"m1": "starter", "m2": "growth", "m3": "free", "bloom": "growth", "shop": "starter"}
 CUSTOMER_OF = {m: f"cus_{m}" for m in PLAN_OF}
-STAND_IN_PRICE = Decimal("0.05")  # test value only, not a decided rate
+PRICE = Decimal("0.04")  # Priya's rate
 
 
 @pytest.fixture
@@ -25,7 +25,6 @@ def decided(monkeypatch):
     """The assistant with every open input filled in by a stand-in, for testing the mechanism only."""
     for name in ("starter", "growth"):
         monkeypatch.setitem(plans.PLANS[name], "assistant_answers_per_month", 100)
-        monkeypatch.setitem(plans.PLANS[name], "extra_assistant_answer_price", STAND_IN_PRICE)
     assistant = replace(METERED["assistant"], starts="2026-06",
                         exempt=frozenset({"bloom"}), app_store=SKIP)
     return {"labels": METERED["labels"], "assistant": assistant}
@@ -35,6 +34,12 @@ def test_shipped_config_bills_no_assistant_while_inputs_are_open():
     assert "assistant" not in ready() and "labels" in ready()
     owners = {value.owner for value in waiting()["assistant"]}
     assert owners == {"Priya Shah", "Marcus Lee", "Theo Grant"}
+
+
+def test_starter_and_growth_pay_four_cents_an_answer():
+    assert plans.PLANS["starter"]["extra_assistant_answer_price"] == PRICE
+    assert plans.PLANS["growth"]["extra_assistant_answer_price"] == PRICE
+    assert plans.PLANS["free"]["extra_assistant_answer_price"] is None
 
 
 def test_assistant_bills_completed_answers_not_attempts():
@@ -53,7 +58,7 @@ def test_shipped_config_posts_only_labels():
 def test_starter_and_growth_pay_past_the_allowance_and_free_never(decided):
     totals = {("m1", ASSISTANT_ANSWERS): 340, ("m2", ASSISTANT_ANSWERS): 100, ("m3", ASSISTANT_ANSWERS): 500}
     charges = charges_for("2026-06", totals, PLAN_OF, metered=decided)
-    assert charges == [Charge("m1", "assistant", "2026-06", 240, STAND_IN_PRICE)]
+    assert charges == [Charge("m1", "assistant", "2026-06", 240, PRICE)]
 
 
 def test_growth_pays_too(decided):
@@ -90,6 +95,6 @@ def test_one_invoice_line_per_period_and_its_own_key(decided):
     assert run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, posted, period="2026-06", metered=decided) == 2
     assistant = [c for c in FakeStripe.InvoiceItem.created if c["idempotency_key"] == "m1:assistant:2026-06"]
     assert len(assistant) == 1
-    assert assistant[0]["description"] == "Assistant answers, June 2026: 200 × $0.05"
-    assert assistant[0]["amount"] == 1000
+    assert assistant[0]["description"] == "Assistant answers, June 2026: 200 × $0.04"
+    assert assistant[0]["amount"] == 800
     assert run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, posted, period="2026-06", metered=decided) == 0

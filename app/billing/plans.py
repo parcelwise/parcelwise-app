@@ -3,9 +3,9 @@
 A plan's allowance is what the subscription includes. Past it, a plan with an `extra_label_price` keeps buying
 and pays per label on the next invoice (app/billing/nightly.py); a plan without one stops.
 
-The assistant is metered on Starter and Growth (Priya, founders sync Oct 29). How many answers a month are
-included and what one costs past that are not decided yet: they are `Undecided` below, and the nightly job posts
-no assistant charge until both are filled in.
+The assistant is metered on Starter and Growth (Priya, founders sync Oct 29) at $0.04 an answer past the allowance
+(Priya). How many answers a month are included is not decided yet: it is `Undecided` below, and the nightly job
+posts no assistant charge until it is filled in.
 """
 
 from dataclasses import dataclass
@@ -28,7 +28,7 @@ def is_undecided(value) -> bool:
 
 
 ASSISTANT_ALLOWANCE = Undecided("How many assistant answers a month are included on this plan?", "Priya Shah")
-ASSISTANT_PRICE = Undecided("What do we charge per assistant answer past the monthly allowance?", "Priya Shah")
+ASSISTANT_PRICE = Decimal("0.04")  # per answer past the allowance, Starter and Growth (Priya, Raven task afdabadc60bd)
 
 PLANS = {
     "free": {
