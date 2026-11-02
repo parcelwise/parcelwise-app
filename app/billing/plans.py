@@ -2,14 +2,30 @@
 
 A plan's allowance is what the subscription includes. Past it, a plan with an `extra_label_price` keeps buying
 and pays per label on the next invoice (app/billing/nightly.py); a plan without one stops.
+
+The assistant is metered on Starter and Growth, in arrears on the monthly invoice like extra labels (Priya,
+founders sync Oct 29). Free has no assistant, so nothing is metered there. Past the included answers each one
+costs $0.04; Starter includes 200 answers a month and Growth 1,000 (Priya, Raven ea7114b15829, 3e7cfb720dab):
+most shops never reach it, and the heavy ones are the ones costing us.
 """
 
 from decimal import Decimal
 
+ASSISTANT_PRICE = Decimal("0.04")  # per answer past the allowance, Starter and Growth (Priya, Raven ea7114b15829)
+
 PLANS = {
-    "free": {"labels_per_month": 50, "assistant": False, "extra_label_price": None},
-    "starter": {"labels_per_month": 1_000, "assistant": True, "extra_label_price": Decimal("0.08")},
-    "growth": {"labels_per_month": None, "assistant": True, "extra_label_price": None},
+    "free": {
+        "labels_per_month": 50, "assistant": False, "extra_label_price": None,
+        "assistant_answers_per_month": None, "assistant_answer_price": None,
+    },
+    "starter": {
+        "labels_per_month": 1_000, "assistant": True, "extra_label_price": Decimal("0.08"),
+        "assistant_answers_per_month": 200, "assistant_answer_price": ASSISTANT_PRICE,
+    },
+    "growth": {
+        "labels_per_month": None, "assistant": True, "extra_label_price": None,
+        "assistant_answers_per_month": 1_000, "assistant_answer_price": ASSISTANT_PRICE,
+    },
 }
 
 

@@ -60,3 +60,32 @@ def test_month_to_date_is_one_merchant_this_month():
         "assistant": 10,
         "labels": 18,
     }
+
+
+def test_rollup_writes_attempts_and_completed_answers_separately(monkeypatch):
+    """The cost count (every attempt, #216) stays; billing gets one row per completed request id."""
+    from contextlib import contextmanager
+
+    from app.usage import store
+    from app.usage.daily import ASSISTANT_ANSWERED
+
+    class Cursor:
+        def __init__(self):
+            self.statements, self.rowcount = [], 0
+
+        def execute(self, sql, params=()):
+            self.statements.append((sql, params))
+            self.rowcount = 2
+
+    cur = Cursor()
+
+    @contextmanager
+    def transaction():
+        yield cur
+
+    monkeypatch.setattr(store, "transaction", transaction)
+    assert store.UsageStore().rollup_day(date(2026, 6, 1)) == 4
+    (_, _), (attempts, _), (answered, params) = cur.statements
+    assert "status <> 'voided'" in attempts and "GROUP BY merchant_id, feature" in attempts
+    assert "feature = 'assistant' AND status = 'completed'" in answered and "COUNT(DISTINCT request_id)" in answered
+    assert params[1] == ASSISTANT_ANSWERED
