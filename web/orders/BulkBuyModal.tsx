@@ -99,7 +99,7 @@ function BulkProgress({ jobId, selections, onDone }: { jobId: number; selections
 
   if (!data) return <div className="modal">Starting…</div>;
   const { counts } = data;
-  const total = counts.pending + counts.bought + counts.failed + counts.needs_approval;
+  const total = counts.pending + counts.bought + counts.failed + counts.needs_approval + counts.already_labelled;
 
   return (
     <div role="dialog" className="modal">
@@ -112,6 +112,12 @@ function BulkProgress({ jobId, selections, onDone }: { jobId: number; selections
         <p className="warning">
           The price changed or the quote expired for {data.needsApproval.map(label).join(", ")}. We didn&apos;t buy
           these. Select them again to see the new price.
+        </p>
+      )}
+      {data.alreadyLabelled.length > 0 && (
+        <p className="muted">
+          {data.alreadyLabelled.map(label).join(", ")} got a label some other way while this was running, so we
+          didn&apos;t buy another.
         </p>
       )}
       {data.failed.length > 0 && (

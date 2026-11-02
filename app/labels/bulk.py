@@ -50,11 +50,16 @@ class BulkPlan:
         return sum((item.shown_price for item in self.to_buy), Decimal("0"))
 
 
+class AlreadyLabelled(Exception):
+    """The order got a live label (say, bought on its own) after the bulk job was queued. Not bought again."""
+
+
 @dataclass
 class BulkResult:
     bought: list[Label] = field(default_factory=list)
     failed: list[tuple[str, CarrierError]] = field(default_factory=list)
     needs_approval: list[str] = field(default_factory=list)
+    already_labelled: list[str] = field(default_factory=list)
 
 
 def plan_bulk(
@@ -117,12 +122,20 @@ def buy_all(
     *,
     job_id: str,
     pace: Callable[[str], None],
+    has_live_label: Callable[[object], bool],
     on_result: Callable[[BulkItem, Label | Exception], None] = lambda item, outcome: None,
 ) -> BulkResult:
-    """Buy each item in order. `on_result` is called after every order so progress can be saved as it happens."""
+    """Buy each item in order. `on_result` is called after every order so progress can be saved as it happens.
+
+    `has_live_label` is checked again right before each purchase: the order may have been labelled since the job
+    was queued, and an order with a live label never gets a second one (fea8c5c7ec77)."""
     result = BulkResult()
     for item in items:
         pace(item.rate.carrier)
+        if has_live_label(item.order):
+            result.already_labelled.append(item.order.id)
+            on_result(item, AlreadyLabelled(item.order.id))
+            continue
         try:
             label = purchase_label(
                 item.order,

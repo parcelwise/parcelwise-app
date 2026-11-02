@@ -45,9 +45,10 @@ export type BulkPreview = {
 
 export type BulkJobStatus = {
   status: "queued" | "running" | "done";
-  counts: { pending: number; bought: number; failed: number; needs_approval: number };
+  counts: { pending: number; bought: number; failed: number; needs_approval: number; already_labelled: number };
   failed: { orderId: string; error: string }[];
   needsApproval: string[];
+  alreadyLabelled: string[];
 };
 
 const bulkBody = (selections: BulkSelection[]) =>

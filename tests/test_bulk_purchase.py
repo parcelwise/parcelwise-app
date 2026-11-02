@@ -6,6 +6,7 @@ import pytest
 from app.labels import carriers
 from app.labels.bulk import (
     USPS_BULK_PER_MINUTE,
+    AlreadyLabelled,
     BulkItem,
     buy_all,
     carrier_pacer,
@@ -34,6 +35,10 @@ def fake(monkeypatch):
     carrier = FakeCarrier()
     monkeypatch.setitem(carriers.CARRIERS, "usps", lambda account: carrier)
     return carrier
+
+
+def no_label(order):
+    return False
 
 
 def no_pace(carrier):
@@ -91,7 +96,7 @@ def test_total_is_a_decimal_sum_of_what_will_be_bought(fresh_rate):
 
 
 def test_each_order_is_bought_once_with_its_own_key(fake, fresh_rate):
-    result = buy_all(items(3, fresh_rate), job_id="j1", pace=no_pace)
+    result = buy_all(items(3, fresh_rate), job_id="j1", has_live_label=no_label, pace=no_pace)
     assert fake.bought == ["bulk:j1:o0", "bulk:j1:o1", "bulk:j1:o2"]
     assert [label.order_id for label in result.bought] == ["o0", "o1", "o2"]
 
@@ -115,20 +120,20 @@ class FailsOn(FakeCarrier):
 def test_a_failure_is_reported_and_the_rest_are_still_bought(monkeypatch, fresh_rate):
     carrier = FailsOn("o1")
     monkeypatch.setitem(carriers.CARRIERS, "usps", lambda account: carrier)
-    result = buy_all(items(3, fresh_rate), job_id="j1", pace=no_pace)
+    result = buy_all(items(3, fresh_rate), job_id="j1", has_live_label=no_label, pace=no_pace)
     assert [label.order_id for label in result.bought] == ["o0", "o2"]
     assert [order_id for order_id, _ in result.failed] == ["o1"]
 
 
 def test_stale_quote_is_skipped_for_the_merchant_to_approve(fake):
     stale = Rate("usps", "ground_advantage", PRICE, datetime.now(timezone.utc) - timedelta(minutes=11), "r")
-    result = buy_all(items(2, stale), job_id="j1", pace=no_pace)
+    result = buy_all(items(2, stale), job_id="j1", has_live_label=no_label, pace=no_pace)
     assert fake.bought == []
     assert result.needs_approval == ["o0", "o1"]
 
 
 def test_changed_price_is_skipped_for_the_merchant_to_approve(fake, fresh_rate):
-    result = buy_all(items(1, fresh_rate, Decimal("4.99")), job_id="j1", pace=no_pace)
+    result = buy_all(items(1, fresh_rate, Decimal("4.99")), job_id="j1", has_live_label=no_label, pace=no_pace)
     assert fake.bought == []
     assert result.needs_approval == ["o0"]
 
@@ -137,14 +142,40 @@ def test_on_result_is_told_about_every_order(monkeypatch, fresh_rate):
     carrier = FailsOn("o1")
     monkeypatch.setitem(carriers.CARRIERS, "usps", lambda account: carrier)
     seen = []
-    buy_all(items(3, fresh_rate), job_id="j1", pace=no_pace, on_result=lambda item, out: seen.append(type(out)))
+    buy_all(items(3, fresh_rate), job_id="j1", has_live_label=no_label, pace=no_pace, on_result=lambda item, out: seen.append(type(out)))
     assert [t.__name__ for t in seen] == ["Label", "CarrierError", "Label"]
 
 
 def test_pace_is_called_with_the_carrier_before_every_purchase(fake, fresh_rate):
     calls = []
-    buy_all(items(3, fresh_rate), job_id="j1", pace=lambda carrier: calls.append((carrier, len(fake.bought))))
+    buy_all(items(3, fresh_rate), job_id="j1", has_live_label=no_label, pace=lambda carrier: calls.append((carrier, len(fake.bought))))
     assert calls == [("usps", 0), ("usps", 1), ("usps", 2)]
+
+
+def test_order_labelled_since_the_job_was_queued_is_not_bought_again(fake, fresh_rate):
+    seen = []
+    result = buy_all(
+        items(3, fresh_rate),
+        job_id="j1",
+        has_live_label=lambda order: order.id == "o1",
+        pace=no_pace,
+        on_result=lambda item, out: seen.append(type(out)),
+    )
+    assert fake.bought == ["bulk:j1:o0", "bulk:j1:o2"]
+    assert result.already_labelled == ["o1"]
+    assert seen[1] is AlreadyLabelled
+
+
+def test_live_label_is_checked_after_pacing_right_before_buying(fake, fresh_rate):
+    events = []
+    buy_all(
+        items(1, fresh_rate),
+        job_id="j1",
+        has_live_label=lambda order: events.append("check") or False,
+        pace=lambda carrier: events.append("pace"),
+    )
+    assert events == ["pace", "check"]
+    assert fake.bought == ["bulk:j1:o0"]
 
 
 def test_stale_rate_error_is_not_a_carrier_error():

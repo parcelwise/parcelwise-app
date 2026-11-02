@@ -19,7 +19,7 @@ CREATE TABLE bulk_label_job_items (
     rate_id      TEXT NOT NULL,
     quoted_at    TIMESTAMPTZ NOT NULL,
     shown_price  NUMERIC(10, 2) NOT NULL,
-    status       TEXT NOT NULL DEFAULT 'pending',  -- pending, bought, failed, needs_approval
+    status       TEXT NOT NULL DEFAULT 'pending',  -- pending, bought, failed, needs_approval, already_labelled
     error        TEXT,
     label_id     BIGINT REFERENCES labels(id),
     PRIMARY KEY (job_id, position)

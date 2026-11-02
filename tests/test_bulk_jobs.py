@@ -26,9 +26,9 @@ def selection(order_id, *, minutes_old=0, price="5.40"):
     return Selection(order_id, "usps", "ground_advantage", f"rate_{order_id}", quoted, Decimal(price))
 
 
-def fake_store(monkeypatch, jobs):
+def fake_store(monkeypatch, jobs, labelled=()):
     """jobs: {job_id: (merchant_id, [Selection])}. Replaces the SQL in bulk_jobs with dict operations."""
-    state = {"queued": list(jobs), "outcomes": {}, "done": [], "transactions": 0}
+    state = {"queued": list(jobs), "outcomes": {}, "done": [], "transactions": 0, "labelled": set(labelled)}
 
     def claim(conn):
         if not state["queued"]:
@@ -47,6 +47,7 @@ def fake_store(monkeypatch, jobs):
     monkeypatch.setattr(bulk_jobs, "pending_items", pending)
     monkeypatch.setattr(bulk_jobs, "record_outcome", record)
     monkeypatch.setattr(bulk_jobs, "finish_job", lambda conn, job_id: state["done"].append(job_id))
+    monkeypatch.setattr(bulk_jobs, "order_has_live_label", lambda conn, order_id: order_id in state["labelled"])
 
     @contextmanager
     def transaction():
@@ -79,6 +80,15 @@ def test_worker_skips_items_already_recorded_when_a_job_is_picked_up_again(monke
     state["outcomes"][7] = {0: "Label"}
     worker.run_once(transaction, load_order=load_order, pace=lambda carrier: None)
     assert carrier.bought == ["bulk:7:b"]
+
+
+def test_worker_does_not_buy_an_order_labelled_after_the_job_was_queued(monkeypatch):
+    carrier = FakeCarrier()
+    monkeypatch.setitem(carriers.CARRIERS, "usps", lambda account: carrier)
+    state, transaction = fake_store(monkeypatch, {7: ("m1", [selection("a"), selection("b")])}, labelled={"a"})
+    worker.run_once(transaction, load_order=load_order, pace=lambda carrier: None)
+    assert carrier.bought == ["bulk:7:b"]
+    assert state["outcomes"][7] == {0: "AlreadyLabelled", 1: "Label"}
 
 
 def test_worker_says_when_there_is_nothing_to_do(monkeypatch):

@@ -9,7 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Callable
 
-from app.labels.bulk import BulkItem, BulkPlan, buy_all, idempotency_key, plan_bulk
+from app.labels.bulk import AlreadyLabelled, BulkItem, BulkPlan, buy_all, idempotency_key, plan_bulk
 from app.labels.purchase import Label, StaleRateError
 from app.labels.rates import Rate
 
@@ -149,6 +149,8 @@ def record_outcome(conn, job_id: int, position: int, merchant_id: str, outcome: 
         status, error = "bought", None
     elif isinstance(outcome, StaleRateError):
         label_id, status, error = None, "needs_approval", None
+    elif isinstance(outcome, AlreadyLabelled):
+        label_id, status, error = None, "already_labelled", None
     else:
         label_id, status, error = None, "failed", str(outcome)
     conn.execute(
@@ -156,6 +158,12 @@ def record_outcome(conn, job_id: int, position: int, merchant_id: str, outcome: 
         "WHERE job_id = %s AND position = %s",
         (status, error, label_id, job_id, position),
     )
+
+
+def order_has_live_label(conn, order_id: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM labels WHERE order_id = %s AND voided_at IS NULL LIMIT 1", (order_id,)
+    ).fetchone() is not None
 
 
 def finish_job(conn, job_id: int) -> None:
@@ -185,7 +193,11 @@ def run_job(
         with transaction() as conn:
             record_outcome(conn, job_id, position_of[item.order.id], merchant_id, outcome)
 
-    buy_all(items, job_id=str(job_id), pace=pace, on_result=save)
+    def has_live_label(order) -> bool:
+        with transaction() as conn:
+            return order_has_live_label(conn, order.id)
+
+    buy_all(items, job_id=str(job_id), pace=pace, has_live_label=has_live_label, on_result=save)
     with transaction() as conn:
         finish_job(conn, job_id)
 
@@ -200,7 +212,7 @@ def job_status(conn, merchant_id: str, job_id: int) -> dict:
     items = conn.execute(
         "SELECT order_id, status, error FROM bulk_label_job_items WHERE job_id = %s ORDER BY position", (job_id,)
     ).fetchall()
-    counts = {"pending": 0, "bought": 0, "failed": 0, "needs_approval": 0}
+    counts = {"pending": 0, "bought": 0, "failed": 0, "needs_approval": 0, "already_labelled": 0}
     for _, status, _ in items:
         counts[status] += 1
     return {
@@ -208,4 +220,5 @@ def job_status(conn, merchant_id: str, job_id: int) -> dict:
         "counts": counts,
         "failed": [{"orderId": order_id, "error": error} for order_id, status, error in items if status == "failed"],
         "needsApproval": [order_id for order_id, status, _ in items if status == "needs_approval"],
+        "alreadyLabelled": [order_id for order_id, status, _ in items if status == "already_labelled"],
     }
