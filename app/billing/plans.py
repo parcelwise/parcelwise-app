@@ -4,9 +4,9 @@ A plan's allowance is what the subscription includes. Past it, a plan with an `e
 and pays per label on the next invoice (app/billing/nightly.py); a plan without one stops.
 
 The assistant is metered on Starter and Growth, in arrears on the monthly invoice like extra labels (Priya,
-founders sync Oct 29). Free has no assistant, so nothing is metered there. The included answers and the price
-per answer past them are still Priya's to set: they stay `Open` until she does, and nothing charges for the
-assistant while they are.
+founders sync Oct 29). Free has no assistant, so nothing is metered there. Past the included answers each one
+costs $0.04 (Priya). The included answers are still Priya's to set: they stay `Open` until she does, and nothing
+charges for the assistant while they are.
 """
 
 from decimal import Decimal
@@ -14,7 +14,7 @@ from decimal import Decimal
 from app.billing.open_calls import Open
 
 ASSISTANT_ALLOWANCE = Open("3e7cfb720dab", "How many assistant answers a month are included, per plan?")
-ASSISTANT_PRICE = Open("ea7114b15829", "What is the price per assistant answer past the allowance, per plan?")
+ASSISTANT_PRICE = Decimal("0.04")  # per answer past the allowance, Starter and Growth (Priya, Raven ea7114b15829)
 
 PLANS = {
     "free": {

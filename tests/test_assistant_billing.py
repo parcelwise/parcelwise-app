@@ -42,8 +42,12 @@ def answered(monkeypatch):
 def test_the_open_calls_are_still_open():
     assistant = METERED["assistant"]
     for value in (assistant.first_period, assistant.exempt, assistant.charge_app_store,
-                  PLANS["starter"]["assistant_answer_price"], PLANS["growth"]["assistant_answers_per_month"]):
+                  PLANS["starter"]["assistant_answers_per_month"], PLANS["growth"]["assistant_answers_per_month"]):
         assert is_open(value)
+
+
+def test_starter_and_growth_pay_four_cents_an_answer_past_the_allowance():
+    assert PLANS["starter"]["assistant_answer_price"] == PLANS["growth"]["assistant_answer_price"] == Decimal("0.04")
 
 
 def test_free_has_no_assistant_to_meter():
