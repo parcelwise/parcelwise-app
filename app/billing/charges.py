@@ -16,7 +16,9 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-FEATURE_LABEL = {"labels": "Extra labels"}
+# The words on the invoice line. The assistant's wording is OPEN (Raven b7ef38fcfec6, Marcus): until it is set
+# the nightly job posts no assistant charge (app/billing/nightly.py), so an invoice never reads "assistant, ...".
+FEATURE_LABEL = {"labels": "Extra labels", "assistant": None}
 
 
 @dataclass(frozen=True)
@@ -35,7 +37,7 @@ class Charge:
     def description(self) -> str:
         """One line per feature per period: the feature, the period, the quantity and the unit price (#124)."""
         month = date.fromisoformat(self.period + "-01").strftime("%B %Y")
-        return f"{FEATURE_LABEL.get(self.feature, self.feature)}, {month}: {self.quantity} × ${self.unit_price}"
+        return f"{FEATURE_LABEL.get(self.feature) or self.feature}, {month}: {self.quantity} × ${self.unit_price}"
 
     @property
     def idempotency_key(self) -> str:

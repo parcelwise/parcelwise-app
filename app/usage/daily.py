@@ -11,6 +11,11 @@ from datetime import date
 
 PAGE = 500
 
+# A count the rollup derives, never an event anyone records: one per question that got a completed answer,
+# however many attempts it took. "assistant" keeps counting every attempt, which is what the model cost us
+# (#216); this is the one use per answer of #80, which is what a merchant would be billed for.
+ASSISTANT_ANSWERS = "assistant_answers"
+
 
 @dataclass(frozen=True, order=True)
 class Cursor:
