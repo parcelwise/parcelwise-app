@@ -1,5 +1,6 @@
 """Charging for the assistant: completed answers (Jordan), $0.04 past 200 a month on Starter and 1,000 on Growth,
-from December 2026 (Priya). Bloom & Co's merchant id and App Store handling are still open; until they are answered, nothing charges for it and label charges carry on as before."""
+from December 2026 (Priya). App Store installs are never charged through Stripe (Theo). Bloom & Co's merchant id
+is still open; until they are answered, nothing charges for it and label charges carry on as before."""
 
 from dataclasses import replace
 from decimal import Decimal
@@ -9,7 +10,7 @@ import pytest
 from app.billing import nightly
 from app.billing.charges import Charge
 from app.billing.nightly import METERED, Held, charges_for, run
-from app.billing.open_calls import is_open
+from app.billing.open_calls import Open, is_open
 from app.billing.plans import PLANS
 from app.usage.daily import ASSISTANT_ANSWERED
 from tests.test_charges import FakeStripe
@@ -41,7 +42,11 @@ def answered(monkeypatch):
 
 def test_the_open_calls_are_still_open():
     assistant = METERED["assistant"]
-    assert is_open(assistant.exempt) and is_open(assistant.charge_app_store)
+    assert is_open(assistant.exempt)
+
+
+def test_app_store_installs_are_never_charged_through_stripe():
+    assert METERED["assistant"].charge_app_store is False
 
 
 def test_starter_includes_200_answers_and_growth_1000():
@@ -105,10 +110,10 @@ def test_exempt_merchants_are_not_charged(answered):
     assert [c.merchant_id for c in charges] == ["m1"]
 
 
-def test_app_store_merchants_wait_on_their_own_call(answered, monkeypatch):
+def test_an_open_app_store_call_holds_only_app_store_merchants(answered, monkeypatch):
     answered()
     metered = dict(nightly.METERED)
-    metered["assistant"] = replace(metered["assistant"], charge_app_store=METERED["assistant"].charge_app_store)
+    metered["assistant"] = replace(metered["assistant"], charge_app_store=Open("b9d5a20eb56f", "App Store?"))
     monkeypatch.setattr(nightly, "METERED", metered)
     held = Held()
     charges = charges_for("2026-06", {("m1", "assistant"): 500, ("m2", "assistant"): 500}, PLAN_OF,

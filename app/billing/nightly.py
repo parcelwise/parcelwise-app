@@ -40,7 +40,9 @@ METERED = {
         # Bloom & Co only, until Sam clears their order form (Sam, Raven c5fd81c49082). Their merchant id is not in
         # the repo; until it is put here, every assistant charge is held so they cannot be charged by mistake.
         exempt=Open("c5fd81c49082", "Bloom & Co's merchant id (merchants.id), to exempt them from assistant charges"),
-        charge_app_store=Open("b9d5a20eb56f", "How are App Store-installed merchants charged for assistant use?"),
+        # App Store installs are charged through Shopify Billing usage charges, never Stripe (Theo, Raven b9d5a20eb56f).
+        # That path is not built yet, so this job leaves them out.
+        charge_app_store=False,
     ),
 }
 
