@@ -1,5 +1,5 @@
-"""Charging for the assistant. It bills completed answers, not attempts (Jordan). Its price, allowance, start month,
-exemptions and App Store handling are open in Raven; until they are answered, nothing charges for it and label charges carry on as before."""
+"""Charging for the assistant: completed answers (Jordan), $0.04 past 200 a month on Starter and 1,000 on Growth,
+from December 2026 (Priya). Bloom & Co's merchant id and App Store handling are still open; until they are answered, nothing charges for it and label charges carry on as before."""
 
 from dataclasses import replace
 from decimal import Decimal
@@ -41,9 +41,18 @@ def answered(monkeypatch):
 
 def test_the_open_calls_are_still_open():
     assistant = METERED["assistant"]
-    for value in (assistant.first_period, assistant.exempt, assistant.charge_app_store,
-                  PLANS["starter"]["assistant_answers_per_month"], PLANS["growth"]["assistant_answers_per_month"]):
-        assert is_open(value)
+    assert is_open(assistant.exempt) and is_open(assistant.charge_app_store)
+
+
+def test_starter_includes_200_answers_and_growth_1000():
+    assert PLANS["starter"]["assistant_answers_per_month"] == 200
+    assert PLANS["growth"]["assistant_answers_per_month"] == 1_000
+
+
+def test_charging_starts_with_december_2026():
+    assert METERED["assistant"].first_period == "2026-12"
+    assert charges_for("2026-11", {("m1", "assistant"): 5_000}, PLAN_OF, held=(held := Held())) == []
+    assert len(held) == 0  # before the first month: never charged, nothing held
 
 
 def test_starter_and_growth_pay_four_cents_an_answer_past_the_allowance():
@@ -57,10 +66,10 @@ def test_free_has_no_assistant_to_meter():
 def test_until_answered_nothing_charges_for_the_assistant_and_labels_still_do():
     held = Held()
     totals = {("m1", "assistant"): 5_000, ("m2", "assistant"): 5_000, ("m1", "labels"): 1_212}
-    charges = charges_for("2026-06", totals, PLAN_OF, held=held)
+    charges = charges_for("2026-12", totals, PLAN_OF, held=held)
     assert [(c.feature, c.quantity) for c in charges] == [("labels", 212)]
     assert len(held) == 2
-    assert held.by_node == {"22fc5b84721e": {("m1", "assistant"), ("m2", "assistant")}}
+    assert held.by_node == {"c5fd81c49082": {("m1", "assistant"), ("m2", "assistant")}}
 
 
 def test_the_nightly_run_posts_labels_and_holds_the_assistant():
@@ -69,7 +78,7 @@ def test_the_nightly_run_posts_labels_and_holds_the_assistant():
     held = Held()
     assert run(usage, PLAN_OF, CUSTOMER_OF, FakeStripe, FakePostedTable(), period="2026-06", held=held) == 1
     assert [c["description"] for c in FakeStripe.InvoiceItem.created] == ["Extra labels, June 2026: 200 × $0.08"]
-    assert len(held) == 1
+    assert len(held) == 0  # June is before the assistant was charged
 
 
 def test_once_answered_starter_and_growth_pay_past_the_allowance(answered):

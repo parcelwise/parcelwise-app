@@ -5,15 +5,12 @@ and pays per label on the next invoice (app/billing/nightly.py); a plan without 
 
 The assistant is metered on Starter and Growth, in arrears on the monthly invoice like extra labels (Priya,
 founders sync Oct 29). Free has no assistant, so nothing is metered there. Past the included answers each one
-costs $0.04 (Priya). The included answers are still Priya's to set: they stay `Open` until she does, and nothing
-charges for the assistant while they are.
+costs $0.04; Starter includes 200 answers a month and Growth 1,000 (Priya, Raven ea7114b15829, 3e7cfb720dab):
+most shops never reach it, and the heavy ones are the ones costing us.
 """
 
 from decimal import Decimal
 
-from app.billing.open_calls import Open
-
-ASSISTANT_ALLOWANCE = Open("3e7cfb720dab", "How many assistant answers a month are included, per plan?")
 ASSISTANT_PRICE = Decimal("0.04")  # per answer past the allowance, Starter and Growth (Priya, Raven ea7114b15829)
 
 PLANS = {
@@ -23,11 +20,11 @@ PLANS = {
     },
     "starter": {
         "labels_per_month": 1_000, "assistant": True, "extra_label_price": Decimal("0.08"),
-        "assistant_answers_per_month": ASSISTANT_ALLOWANCE, "assistant_answer_price": ASSISTANT_PRICE,
+        "assistant_answers_per_month": 200, "assistant_answer_price": ASSISTANT_PRICE,
     },
     "growth": {
         "labels_per_month": None, "assistant": True, "extra_label_price": None,
-        "assistant_answers_per_month": ASSISTANT_ALLOWANCE, "assistant_answer_price": ASSISTANT_PRICE,
+        "assistant_answers_per_month": 1_000, "assistant_answer_price": ASSISTANT_PRICE,
     },
 }
 

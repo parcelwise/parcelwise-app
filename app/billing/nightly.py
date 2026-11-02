@@ -36,8 +36,10 @@ METERED = {
         "assistant_answers_per_month",
         "assistant_answer_price",
         counted_from=ASSISTANT_ANSWERED,  # completed answers only, not attempts (Jordan, Raven 75668ac5d832)
-        first_period=Open("22fc5b84721e", "Which month is the first one assistant usage is charged for?"),
-        exempt=Open("c5fd81c49082", "Is Bloom & Co excluded from assistant charges, and are any other merchants?"),
+        first_period="2026-12",  # December usage, on January's invoice (Priya, Raven 22fc5b84721e)
+        # Bloom & Co only, until Sam clears their order form (Sam, Raven c5fd81c49082). Their merchant id is not in
+        # the repo; until it is put here, every assistant charge is held so they cannot be charged by mistake.
+        exempt=Open("c5fd81c49082", "Bloom & Co's merchant id (merchants.id), to exempt them from assistant charges"),
         charge_app_store=Open("b9d5a20eb56f", "How are App Store-installed merchants charged for assistant use?"),
     ),
 }
