@@ -19,6 +19,11 @@ class CarrierError(Exception):
 
 CARRIERS: dict[str, type] = {}
 
+# Most label purchases we send per minute for one merchant's carrier account. Carriers not listed have no limit.
+# USPS: Ana Ruiz (carrier ops), Raven decision d0665701c530. UPS is deliberately unlimited for now, and the limit
+# covers batch purchases only, not single "Buy label" clicks (Ana Ruiz, Raven decision 68fe81488e40).
+PURCHASES_PER_MINUTE: dict[str, int] = {"usps": 40}
+
 
 def register(name: str):
     def wrap(cls):

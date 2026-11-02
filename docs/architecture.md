@@ -34,3 +34,10 @@ Shopify ──webhooks──▶ app/shopify ──▶ orders (Postgres) ──�
 
 Shopify sync runs on a five-minute cron. Shipping confirmation emails go out through Postmark right after a
 purchase. Stripe webhooks update the merchant's plan.
+
+Buying labels for many orders at once (up to 500) is a job in Postgres (`label_batches`, `label_batch_items`).
+The `label-worker` service (`app/labels/worker.py`, one instance) buys each order through `purchase_label()`,
+at most 40 USPS purchases a minute per merchant account. Before queuing, the whole batch is refused if it would go
+over the plan's monthly allowance. Orders that already have a live label are skipped for reprint. Orders whose
+quote expires or changes are returned for the merchant to approve the new price, and failures are reported for
+retry; labels that bought are kept.

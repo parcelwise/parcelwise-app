@@ -15,3 +15,9 @@ def monthly_allowance(plan: str) -> int | None:
 def within_allowance(plan: str, used_this_month: int) -> bool:
     allowance = monthly_allowance(plan)
     return allowance is None or used_this_month < allowance
+
+
+def labels_left(plan: str, used_this_month: int) -> int | None:
+    """Labels the merchant can still buy this month. None means unlimited."""
+    allowance = monthly_allowance(plan)
+    return None if allowance is None else max(allowance - used_this_month, 0)

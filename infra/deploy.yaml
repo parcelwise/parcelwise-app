@@ -13,4 +13,14 @@ services:
       DATABASE_POOL_SIZE: "10"
       STATEMENT_TIMEOUT_MS: "5000"
 
+  # Buys labels for batches queued from the Orders page. Exactly one instance: the per-account carrier rate limit
+  # (app/labels/carriers.py PURCHASES_PER_MINUTE) is kept in this process.
+  label-worker:
+    command: python -m app.labels.worker
+    instances: 1
+    autoscale: { min: 1, max: 1 }
+    memory: 512mb
+    env:
+      DATABASE_POOL_SIZE: "2"
+
 release_command: python -m scripts.migrate
