@@ -9,21 +9,17 @@ guessing. Raven's host hooks register your first prompt as a task; if they are n
 `bridge_start_task` with repo `parcelwise/parcelwise-app` before reading or editing anything. Then follow what
 Raven returns for the rest of the task.
 
-Every judgment call the change rests on is its own Raven node (`bridge_add_node`), filed before you implement
-the part that depends on it:
+File the judgment calls the change rests on with `bridge_add_node`, one question per node, before you implement
+the part that depends on it. A judgment call is a value or rule this change leans on that the code does not
+settle: the ones nobody has made yet (a price, an allowance, a start date, which merchants are in or out) and
+the ones a record already seems to answer (what counts as one use, which table usage is read from, where
+charges post). Raven settles the second kind from the record and logs whose call it was. Keep it to the calls
+that would change what you build: a feature this size has five or six, not fifteen. How a thing is paged,
+retried or named is engineering, not a call.
 
-- the calls nobody has made yet: a price, an allowance, a start date, a cutoff, a customer exception, which
-  merchants are in or out, where something shows in the dashboard;
-- and the ones an ADR, a pull request or a teammate's earlier call already seems to answer: what counts as one
-  use, which table usage is read from, how reads are paged, where charges post, a Stripe metered price or an
-  invoice item, what makes a charge safe to retry, how a metered feature shows on the invoice, how retries and
-  failed attempts are counted, which plans a feature is on. Raven settles those from the record and logs whose
-  call it was, so the pull request shows what was decided and by whom.
-
-One question per node: short, and the question itself ("Where do assistant charges post?"), not a reading of
-the record ("does ADR 0006 hold given that..."). Your reading of the record, with the ADR or PR it came from,
-goes in `context`. File each question once and do not re-word a question that is already open. Put `paths` and
-a `category` on every node: `pricing` (rates, allowances, which plans), `billing` (charges, invoices, Stripe),
+Short questions, the question itself ("Where do assistant charges post?"), never a reading of the record. Your
+reading, with the ADR or PR it came from, goes in `context`. File each question once. Put `paths` and a
+`category` on every node: `pricing` (rates, allowances, which plans), `billing` (charges, invoices, Stripe),
 `data` (what is counted, which table is read), `customer` (which merchants, exceptions), `ux` (the dashboard),
 `compat` (Shopify and the App Store rules).
 
@@ -32,8 +28,9 @@ that quietly decides one. Build the parts that do not depend on open calls (`bri
 open) and leave the open values as clearly marked inputs the owner's answer fills in.
 
 When the mechanism is built and its tests pass, commit on a branch named after the work and open a draft pull
-request with `gh pr create --draft`, following the PR template; list the open calls under **Decisions** with
-who owns each.
+request with `gh pr create --draft`, following the PR template. Keep the body short: two sentences under **What
+and why**, the commands under **How it was tested**, and under **Decisions** exactly what `bridge_pr_summary`
+returns, nothing more.
 
 - When someone asks who knows something, or why something was decided, ask Raven (`bridge_ask_raven`) first.
 - Write questions for people in plain English a busy teammate can answer in ten seconds.

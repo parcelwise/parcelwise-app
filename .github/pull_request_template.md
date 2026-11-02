@@ -8,7 +8,7 @@
 
 ## Decisions
 
-<!-- Judgment calls this PR makes, and who made them. -->
+<!-- Paste what Raven's bridge_pr_summary returns: one table, who made each call and how. -->
 
 ## Checklist
 
