@@ -89,7 +89,10 @@ class JobDeps:
 
     `load_order(merchant_id, order_id)` must only return the merchant's own order, or None.
     `plan_and_usage(merchant_id)` returns (plan, labels used this month), read when the job starts.
-    `live_label(order)` returns the order's label that hasn't been voided, or None.
+    `live_label(order)` returns the order's label that hasn't been voided, or None. It must see labels bought by an
+    earlier run of this job that died before finishing, so record each label in its own committed transaction, not
+    the job's: then a rerun reprints that order instead of reporting it stale, and the merchant isn't led to buy it
+    a second time from the row.
     """
 
     load_order: Callable[[str, str], object | None]
@@ -187,9 +190,7 @@ def latest_job(conn, merchant_id: str) -> dict | None:
     )
 
 
-# How many merchants' bulk buys one worker process runs at once. Each is still paced at 40 a minute for its own
-# merchant (Raven decision dd18542dfb3e); this only stops one merchant's 5-minute batch from making the next wait.
-WORKER_SLOTS = 8
+# One worker runs one job at a time (Raven decision d773fe7fd066, Ana Ruiz: a Postgres table and one worker for v1).
 IDLE_SECONDS = 2.0
 
 
