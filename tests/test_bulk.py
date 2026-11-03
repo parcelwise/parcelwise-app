@@ -214,6 +214,12 @@ def test_ups_lines_are_refused_before_anything_is_bought(fake):
     assert fake.bought == []
 
 
+def test_ups_lines_are_refused_at_the_quote_step():
+    ups = Rate("ups", "ground", Decimal("7.00"), datetime.now(UTC), "rate_ups")
+    with pytest.raises(CarrierNotSupported):
+        quote_batch([_line("o1"), BulkLine(FakeOrder("o2"), ups, Decimal("7.00"))], plan="growth", used_this_month=0)
+
+
 def test_starter_quote_shows_labels_past_allowance_and_extra_charge():
     lines = [_line(f"o{i}", "5.00") for i in range(200)]
     quote = quote_batch(lines, plan="starter", used_this_month=900)

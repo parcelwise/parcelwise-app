@@ -95,6 +95,13 @@ def check_allowance(plan: str, used_this_month: int, count: int) -> None:
         raise AllowanceExceeded(remaining)
 
 
+def check_carriers(lines: list[BulkLine]) -> None:
+    """Refuse a selection with any carrier bulk buy doesn't cover yet. Nothing is bought."""
+    other = sorted({line.rate.carrier for line in lines} - BULK_CARRIERS)
+    if other:
+        raise CarrierNotSupported(f"bulk buy covers {', '.join(sorted(BULK_CARRIERS))} only, not {', '.join(other)}")
+
+
 def idempotency_key(batch_id: str, order_id: str) -> str:
     """Stable for the order and this bulk attempt, so a retry of the same batch never buys twice."""
     return f"bulk:{batch_id}:{order_id}"
@@ -120,7 +127,8 @@ def quote_batch(lines: list[BulkLine], *, plan: str, used_this_month: int) -> Bu
     confirm step also shows how many labels go past it and the extra charge, inside the total (Raven decision
     da4c0386cf19, Priya Shah). The charge itself still posts through the nightly job (ADR 0006).
     """
-    check_allowance(plan, used_this_month, len(lines))  # a batch that will be refused is refused here too
+    check_carriers(lines)  # a batch that will be refused is refused here too, before the confirm step
+    check_allowance(plan, used_this_month, len(lines))
     carrier_total = total_price(lines)
     allowance = monthly_allowance(plan)
     extra_price = PLANS[plan]["extra_label_price"]
@@ -170,9 +178,7 @@ def buy_labels(
     """
     if len(lines) > MAX_ORDERS:
         raise BulkTooLarge(f"{len(lines)} orders; at most {MAX_ORDERS} per bulk buy")
-    other = sorted({line.rate.carrier for line in lines} - BULK_CARRIERS)
-    if other:
-        raise CarrierNotSupported(f"bulk buy covers {', '.join(sorted(BULK_CARRIERS))} only, not {', '.join(other)}")
+    check_carriers(lines)
     with merchant_lock:
         check_allowance(plan, used_this_month, len(lines))
         return _buy_in_order(lines, batch_id, live_label, clock, sleep)
