@@ -10,9 +10,12 @@ from app.labels.bulk import AllowanceExceeded, BulkTooLarge
 from app.labels.bulk_jobs import (
     BulkAlreadyRunning,
     JobDeps,
+    OrderInBulkBuy,
     SelectedLine,
+    check_not_in_bulk_buy,
     get_job,
     latest_job,
+    pending_order_ids,
     run_next_job,
     start_bulk_buy,
     work,
@@ -65,6 +68,10 @@ class FakeJobsDb:
             job_id, merchant_id = params
             job = self.jobs.get(job_id)
             return Result(self._row(job_id) if job and job["merchant_id"] == merchant_id else None)
+        if sql.startswith("SELECT lines FROM bulk_label_jobs"):
+            (merchant_id,) = params
+            mine = [j for j in self.jobs.values() if j["merchant_id"] == merchant_id and j["status"] == "pending"]
+            return Result((mine[0]["lines"],) if mine else None)
         if "ORDER BY created_at DESC LIMIT 1" in sql:
             (merchant_id,) = params
             mine = [job_id for job_id, job in self.jobs.items() if job["merchant_id"] == merchant_id]
@@ -242,3 +249,21 @@ def test_the_worker_rests_when_nothing_waits_and_stops_when_told(fake):
     )
     assert fake.bought == ["bulk:b1:o1"]
     assert rests == [2.0]
+
+
+def test_a_single_buy_is_blocked_for_an_order_in_a_running_bulk_buy(fake):
+    db = FakeJobsDb()
+    start_bulk_buy(db, "m1", "b1", [_line("o1"), _line("o2", carrier="ups")], plan="growth", used_this_month=0)
+    assert pending_order_ids(db, "m1") == ["o1"]  # the UPS order is skipped by the job, so its row can still buy
+    with pytest.raises(OrderInBulkBuy):
+        check_not_in_bulk_buy(db, "m1", "o1")
+    check_not_in_bulk_buy(db, "m1", "o2")
+    check_not_in_bulk_buy(db, "m2", "o1")  # another merchant's order with the same id is not blocked
+
+
+def test_the_block_lifts_when_the_bulk_buy_finishes(fake):
+    db = FakeJobsDb()
+    start_bulk_buy(db, "m1", "b1", [_line("o1")], plan="growth", used_this_month=0)
+    run_next_job(db, deps())
+    assert pending_order_ids(db, "m1") == []
+    check_not_in_bulk_buy(db, "m1", "o1")

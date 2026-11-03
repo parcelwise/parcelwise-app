@@ -4,11 +4,12 @@ import { age } from "@/lib/time";
 type Props = {
   order: Order;
   selected: boolean;
+  inBulkBuy: boolean;
   onSelect: (order: Order, selected: boolean) => void;
   onBuyLabel: (order: Order) => void;
 };
 
-export function OrderRow({ order, selected, onSelect, onBuyLabel }: Props) {
+export function OrderRow({ order, selected, inBulkBuy, onSelect, onBuyLabel }: Props) {
   return (
     <tr>
       <td>
@@ -27,7 +28,10 @@ export function OrderRow({ order, selected, onSelect, onBuyLabel }: Props) {
       <td>{(order.weightOz / 16).toFixed(1)} lb</td>
       <td className="muted">{age(order.createdAt)}</td>
       <td>
-        <button onClick={() => onBuyLabel(order)}>Buy label</button>
+        {/* Blocked while a running bulk buy will buy this order's label (Raven decision 55ebbf4c3071). */}
+        <button disabled={inBulkBuy} onClick={() => onBuyLabel(order)}>
+          {inBulkBuy ? "In a bulk buy" : "Buy label"}
+        </button>
       </td>
     </tr>
   );

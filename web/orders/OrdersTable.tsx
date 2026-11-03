@@ -1,4 +1,5 @@
-import { Order } from "@/lib/api";
+import { useState } from "react";
+import { BulkJob, Order, pendingBulkOrders } from "@/lib/api";
 import { BulkJobStatus } from "./BulkJobStatus";
 import { OrderRow } from "./OrderRow";
 
@@ -28,6 +29,19 @@ export function OrdersTable({
   onBuyLabel,
   onBuySelected,
 }: Props) {
+  // Orders the running bulk buy will buy; their row's Buy label is blocked until it finishes (Raven 55ebbf4c3071).
+  const [inBulkBuy, setInBulkBuy] = useState<Set<string>>(new Set());
+
+  function onJob(job: BulkJob | null) {
+    if (job?.status === "pending") {
+      pendingBulkOrders()
+        .then((ids) => setInBulkBuy(new Set(ids)))
+        .catch(() => setInBulkBuy(new Set()));
+    } else {
+      setInBulkBuy(new Set());
+    }
+  }
+
   if (orders.length === 0) {
     return <p className="empty">No unfulfilled orders. New Shopify orders show up here within a minute.</p>;
   }
@@ -54,7 +68,7 @@ export function OrdersTable({
   return (
     <>
       {/* The merchant's latest bulk buy, running or finished, when they come back to the page. */}
-      <BulkJobStatus />
+      <BulkJobStatus onJob={onJob} />
       {selected.size > 0 && (
         <div className="bulk-bar">
           {selected.size} selected
@@ -97,6 +111,7 @@ export function OrdersTable({
               key={order.id}
               order={order}
               selected={selected.has(order.id)}
+              inBulkBuy={inBulkBuy.has(order.id)}
               onSelect={toggle}
               onBuyLabel={onBuyLabel}
             />

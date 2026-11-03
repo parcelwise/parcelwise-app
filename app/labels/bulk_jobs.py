@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
 
-from app.labels.bulk import AllowanceExceeded, BulkLine, BulkOutcome, buy_labels, check_batch
+from app.labels.bulk import BULK_CARRIERS, AllowanceExceeded, BulkLine, BulkOutcome, buy_labels, check_batch
 from app.labels.purchase import Label
 from app.labels.rates import Rate
 
@@ -24,6 +24,14 @@ class BulkAlreadyRunning(Exception):
 
     def __init__(self):
         super().__init__("A bulk label buy is already running for your shop. Try again when it finishes.")
+
+
+class OrderInBulkBuy(Exception):
+    """The order is in the merchant's running bulk buy, which will buy its label. Nothing was bought."""
+
+    def __init__(self, order_id: str):
+        super().__init__("This order is in a bulk label buy that is still running. Its label will be bought there.")
+        self.order_id = order_id
 
 
 @dataclass(frozen=True)
@@ -188,6 +196,29 @@ def latest_job(conn, merchant_id: str) -> dict | None:
             (merchant_id,),
         ).fetchone()
     )
+
+
+def pending_order_ids(conn, merchant_id: str) -> list[str]:
+    """Orders the merchant's running bulk buy will buy a label for. Orders it skips (a carrier bulk buy doesn't
+    cover) are not listed: their row's own Buy label still works.
+    """
+    row = conn.execute(
+        "SELECT lines FROM bulk_label_jobs WHERE merchant_id = %s AND status = 'pending'", (merchant_id,)
+    ).fetchone()
+    if row is None:
+        return []
+    (raw,) = row
+    lines = [_line_from_json(item) for item in (json.loads(raw) if isinstance(raw, str) else raw)]
+    return [line.order_id for line in lines if line.rate.carrier in BULK_CARRIERS]
+
+
+def check_not_in_bulk_buy(conn, merchant_id: str, order_id: str) -> None:
+    """Call before a single label buy. While an order sits in a running bulk buy, its own Buy label is blocked
+    (Raven decision 55ebbf4c3071, Jordan Okafor): the two use different idempotency keys, so both would buy a label,
+    and USPS won't refund the second one.
+    """
+    if order_id in pending_order_ids(conn, merchant_id):
+        raise OrderInBulkBuy(order_id)
 
 
 # One worker runs one job at a time (Raven decision d773fe7fd066, Ana Ruiz: a Postgres table and one worker for v1).

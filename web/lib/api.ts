@@ -76,6 +76,9 @@ export const getBulkJob = (jobId: string) => call<BulkJob>(`/labels/bulk/${encod
 
 export const latestBulkJob = () => call<BulkJob | null>("/labels/bulk/latest");
 
+// Orders the running bulk buy will buy; their own Buy label is blocked until it finishes (Raven decision 55ebbf4c3071).
+export const pendingBulkOrders = () => call<string[]>("/labels/bulk/pending-orders");
+
 export const searchOrders = (q: string) => call<Order[]>(`/orders/search?q=${encodeURIComponent(q)}`);
 
 export type AssistantAnswer = {

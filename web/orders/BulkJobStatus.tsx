@@ -18,10 +18,12 @@ export function BulkJobStatus({
   jobId,
   nameOf = (orderId) => orderId,
   onDismiss,
+  onJob,
 }: {
   jobId?: string;
   nameOf?: (orderId: string) => string;
   onDismiss?: () => void;
+  onJob?: (job: BulkJob | null) => void;
 }) {
   const [job, setJob] = useState<BulkJob | null>(null);
   const [error, setError] = useState("");
@@ -34,6 +36,7 @@ export function BulkJobStatus({
         const next = jobId ? await getBulkJob(jobId) : await latestBulkJob();
         if (stopped) return;
         setJob(next);
+        onJob?.(next);
         if (next?.status === "pending") timer = setTimeout(load, POLL_MS);
       } catch (e) {
         if (!stopped) setError(String(e));
