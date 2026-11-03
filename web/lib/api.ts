@@ -48,12 +48,26 @@ export const quoteBulk = (lines: BulkLineInput[]) =>
     body: JSON.stringify({ lines: bulkBody(lines) }),
   });
 
+// A bulk buy runs in the background (Raven decision 5e5e0741c202): starting one returns the job, and the page reads
+// it back until it is done. "pending" while it runs; "refused" means nothing was bought and `reason` says why.
+export type BulkJob = {
+  id: string;
+  status: "pending" | "done" | "refused";
+  outcomes: BulkOutcome[] | null;
+  reason: string;
+  count: number;
+};
+
 export const buyLabelsBulk = (batchId: string, lines: BulkLineInput[]) =>
-  call<BulkOutcome[]>("/labels/bulk", {
+  call<BulkJob>("/labels/bulk", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ batch_id: batchId, lines: bulkBody(lines) }),
   });
+
+export const getBulkJob = (jobId: string) => call<BulkJob>(`/labels/bulk/${encodeURIComponent(jobId)}`);
+
+export const latestBulkJob = () => call<BulkJob | null>("/labels/bulk/latest");
 
 export const searchOrders = (q: string) => call<Order[]>(`/orders/search?q=${encodeURIComponent(q)}`);
 

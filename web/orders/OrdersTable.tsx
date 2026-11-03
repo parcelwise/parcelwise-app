@@ -1,4 +1,5 @@
 import { Order } from "@/lib/api";
+import { BulkJobStatus } from "./BulkJobStatus";
 import { OrderRow } from "./OrderRow";
 
 // 'Select all matching' stops at 200 orders: a label costs real money, and 200 is the most one bulk buy takes
@@ -52,6 +53,8 @@ export function OrdersTable({
 
   return (
     <>
+      {/* The merchant's latest bulk buy, running or finished, when they come back to the page. */}
+      <BulkJobStatus />
       {selected.size > 0 && (
         <div className="bulk-bar">
           {selected.size} selected

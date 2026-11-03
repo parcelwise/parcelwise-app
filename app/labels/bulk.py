@@ -6,8 +6,7 @@ the whole batch.
 """
 
 import time
-from collections.abc import Callable, Iterator
-from contextlib import AbstractContextManager, contextmanager
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -48,29 +47,6 @@ class BulkTooLarge(Exception):
 
 class CarrierNotSupported(Exception):
     """A line uses a carrier bulk buy doesn't cover yet. Nothing was bought."""
-
-
-class BulkAlreadyRunning(Exception):
-    """This merchant already has a bulk buy running. Nothing was bought."""
-
-    def __init__(self):
-        super().__init__("A bulk label buy is already running for your shop. Try again when it finishes.")
-
-
-@contextmanager
-def one_bulk_buy_per_merchant(conn, merchant_id: str) -> Iterator[None]:
-    """Hold a Postgres advisory lock for the merchant while their bulk buy runs; refuse if one already is.
-
-    One bulk buy per merchant at a time, and a second one is refused, not queued (Raven decision af32723a4431,
-    Ana Ruiz). This also keeps the 40-a-minute pace and the allowance check true across batches.
-    """
-    key = f"bulk-labels:{merchant_id}"
-    if not conn.execute("SELECT pg_try_advisory_lock(hashtext(%s))", (key,)).fetchone()[0]:
-        raise BulkAlreadyRunning()
-    try:
-        yield
-    finally:
-        conn.execute("SELECT pg_advisory_unlock(hashtext(%s))", (key,))
 
 
 class AllowanceExceeded(Exception):
@@ -127,8 +103,7 @@ def quote_batch(lines: list[BulkLine], *, plan: str, used_this_month: int) -> Bu
     confirm step also shows how many labels go past it and the extra charge, inside the total (Raven decision
     da4c0386cf19, Priya Shah). The charge itself still posts through the nightly job (ADR 0006).
     """
-    check_carriers(lines)  # a batch that will be refused is refused here too, before the confirm step
-    check_allowance(plan, used_this_month, len(lines))
+    check_batch(lines, plan=plan, used_this_month=used_this_month)  # refused here too, before the confirm step
     carrier_total = total_price(lines)
     allowance = monthly_allowance(plan)
     extra_price = PLANS[plan]["extra_label_price"]
@@ -159,6 +134,14 @@ def _buy_one(line: BulkLine, batch_id: str) -> BulkOutcome:
     return BulkOutcome(line.order.id, "bought", label)
 
 
+def check_batch(lines: list[BulkLine], *, plan: str, used_this_month: int) -> None:
+    """Everything that refuses a whole batch before anything is bought."""
+    if len(lines) > MAX_ORDERS:
+        raise BulkTooLarge(f"{len(lines)} orders; at most {MAX_ORDERS} per bulk buy")
+    check_carriers(lines)
+    check_allowance(plan, used_this_month, len(lines))
+
+
 def buy_labels(
     lines: list[BulkLine],
     *,
@@ -166,22 +149,17 @@ def buy_labels(
     plan: str,
     used_this_month: int,
     live_label: Callable[[object], Label | None],
-    merchant_lock: AbstractContextManager,
     clock: Callable[[], float] = time.monotonic,
     sleep: Callable[[float], None] = time.sleep,
 ) -> list[BulkOutcome]:
     """Buy a label for each line, one at a time through purchase_label(). Outcomes come back in input order.
 
-    `live_label(order)` returns the order's label that hasn't been voided, or None. `merchant_lock` is held for the
-    whole batch; pass one_bulk_buy_per_merchant(conn, merchant_id). Purchases are spaced so the carrier sees at most
-    PURCHASES_PER_MINUTE from the merchant.
+    Runs in the background job (app/labels/bulk_jobs.py), which also keeps it to one per merchant at a time.
+    `live_label(order)` returns the order's label that hasn't been voided, or None. Purchases are spaced so the
+    carrier sees at most PURCHASES_PER_MINUTE from the merchant.
     """
-    if len(lines) > MAX_ORDERS:
-        raise BulkTooLarge(f"{len(lines)} orders; at most {MAX_ORDERS} per bulk buy")
-    check_carriers(lines)
-    with merchant_lock:
-        check_allowance(plan, used_this_month, len(lines))
-        return _buy_in_order(lines, batch_id, live_label, clock, sleep)
+    check_batch(lines, plan=plan, used_this_month=used_this_month)
+    return _buy_in_order(lines, batch_id, live_label, clock, sleep)
 
 
 def _buy_in_order(lines, batch_id, live_label, clock, sleep) -> list[BulkOutcome]:
