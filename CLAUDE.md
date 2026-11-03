@@ -17,8 +17,9 @@ charges post). Raven settles the second kind from the record and logs whose call
 that would change what you build: a feature this size has five or six, not fifteen. How a thing is paged,
 retried or named is engineering, not a call.
 
-Short questions, the question itself ("Where do assistant charges post?"), never a reading of the record. Your
-reading, with the ADR or PR it came from, goes in `context`. File each question once. Put `paths` and a
+Short questions, the way you would ask a colleague across a desk: one plain sentence, fifteen words or so, no
+parentheses, no lists of options inside it ("Where do assistant charges post?"), never a reading of the record.
+Your reading, with the ADR or PR it came from, the options and the detail go in `context` and `options`. File each question once. Put `paths` and a
 `category` on every node: `pricing` (rates, allowances, which plans), `billing` (charges, invoices, Stripe),
 `data` (what is counted, which table is read), `customer` (which merchants, exceptions), `ux` (the dashboard),
 `compat` (Shopify and the App Store rules).
