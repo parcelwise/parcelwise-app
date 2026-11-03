@@ -61,8 +61,8 @@ def start_bulk_buy(
 ):
     """Record a bulk buy for the worker and return the job, still pending. Nothing is bought here.
 
-    A batch that will be refused (too big, a carrier bulk buy doesn't cover, past a Free allowance) is refused now,
-    before it is queued. Sending the same batch id again returns the same job. A second batch while one is pending
+    A batch that will be refused (too big, or past a Free allowance) is refused now, before it is queued. Sending
+    the same batch id again returns the same job. A second batch while one is pending
     for the merchant raises BulkAlreadyRunning (Raven decision af32723a4431, Ana Ruiz).
     """
     check_batch([_as_bulk_line(line, order=None) for line in lines], plan=plan, used_this_month=used_this_month)
