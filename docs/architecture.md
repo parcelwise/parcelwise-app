@@ -48,3 +48,8 @@ Shopify sync runs on a five-minute cron. Shipping confirmation emails go out thr
 purchase. Stripe webhooks update the merchant's plan. The usage rollup runs at 08:00 UTC and the billing job
 at 09:00 UTC (`infra/deploy.yaml`); the billing job posts the closed month's charges on the first and anything
 left behind on the nights after.
+
+The billing job meters extra labels and the assistant (`METERED` in `app/billing/nightly.py`). The assistant
+is billed on Starter and Growth past a monthly allowance, one "Assistant answers" line per merchant and month.
+Its price, allowance, billable usage count, first billed month and install sources are open inputs
+(`app/billing/plans.py`, `app/billing/nightly.py`); until all are set, nothing is charged for it.
