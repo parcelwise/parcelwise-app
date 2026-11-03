@@ -48,3 +48,10 @@ Shopify sync runs on a five-minute cron. Shipping confirmation emails go out thr
 purchase. Stripe webhooks update the merchant's plan. The usage rollup runs at 08:00 UTC and the billing job
 at 09:00 UTC (`infra/deploy.yaml`); the billing job posts the closed month's charges on the first and anything
 left behind on the nights after.
+
+The assistant is metered on Starter and Growth from the December 2026 period. Billing reads the
+`assistant_answers` daily count (one completed answer per question; the `assistant` count is every attempt, our
+model cost) and skips App Store installs, whose new usage charges belong to Shopify Billing. Its price and
+included answers live in `app/billing/plans.py` (500 included on Starter and Growth, $0.02 an answer past that).
+Shops in `OFF_PUBLIC_ASSISTANT_RATE` (Bloom & Co, until legal clears its most-favored-nation clause) pay nothing
+for the assistant. An `Open` plan value holds back that feature's charges and fails the job loudly.
