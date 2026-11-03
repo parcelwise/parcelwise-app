@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
-FEATURE_LABEL = {"labels": "Extra labels"}
+FEATURE_LABEL = {"labels": "Extra labels", "assistant_answers": "Assistant answers"}
 
 
 @dataclass(frozen=True)

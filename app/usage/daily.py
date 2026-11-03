@@ -11,6 +11,10 @@ from datetime import date
 
 PAGE = 500
 
+# A daily count the rollup derives, not a usage_events feature: completed assistant answers, one per question
+# (request id), whatever the attempts. Billing reads this; `assistant` is every attempt, our model cost (#216).
+ASSISTANT_ANSWERS = "assistant_answers"
+
 
 @dataclass(frozen=True, order=True)
 class Cursor:
