@@ -1,9 +1,24 @@
 import { Order } from "@/lib/api";
 import { age } from "@/lib/time";
 
-export function OrderRow({ order, onBuyLabel }: { order: Order; onBuyLabel: (order: Order) => void }) {
+type Props = {
+  order: Order;
+  selected: boolean;
+  onSelect: (order: Order, selected: boolean) => void;
+  onBuyLabel: (order: Order) => void;
+};
+
+export function OrderRow({ order, selected, onSelect, onBuyLabel }: Props) {
   return (
     <tr>
+      <td>
+        <input
+          type="checkbox"
+          aria-label={`Select order #${order.shopifyId}`}
+          checked={selected}
+          onChange={(e) => onSelect(order, e.target.checked)}
+        />
+      </td>
       <td>#{order.shopifyId}</td>
       <td>{order.customer}</td>
       <td>

@@ -27,6 +27,34 @@ export const buyLabel = (orderId: string, rateId: string, shownPrice: string) =>
     body: JSON.stringify({ rate_id: rateId, shown_price: shownPrice }),
   });
 
+export type BulkLineInput = { orderId: string; rateId: string; shownPrice: string };
+
+export type BulkQuote = { carrierTotal: string; labelsPastAllowance: number; extraCharge: string; total: string };
+
+export type BulkOutcome = {
+  orderId: string;
+  status: "bought" | "reprint" | "stale" | "failed";
+  label: Label | null;
+  reason: string;
+};
+
+const bulkBody = (lines: BulkLineInput[]) =>
+  lines.map((l) => ({ order_id: l.orderId, rate_id: l.rateId, shown_price: l.shownPrice }));
+
+export const quoteBulk = (lines: BulkLineInput[]) =>
+  call<BulkQuote>("/labels/bulk/quote", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ lines: bulkBody(lines) }),
+  });
+
+export const buyLabelsBulk = (batchId: string, lines: BulkLineInput[]) =>
+  call<BulkOutcome[]>("/labels/bulk", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ batch_id: batchId, lines: bulkBody(lines) }),
+  });
+
 export const searchOrders = (q: string) => call<Order[]>(`/orders/search?q=${encodeURIComponent(q)}`);
 
 export type AssistantAnswer = {
