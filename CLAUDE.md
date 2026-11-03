@@ -27,7 +27,8 @@ Never settle an open value yourself: no placeholder rate, allowance, start date 
 that quietly decides one. Build the parts that do not depend on open calls (`bridge_wait` says what is still
 open) and leave the open values as clearly marked inputs the owner's answer fills in.
 
-When the mechanism is built and its tests pass, commit on a branch named after the work and open a draft pull
+Build what you can while calls are open, then keep calling `bridge_wait` and fill in each answer as it lands.
+When the mechanism is built, its tests pass and no call is still open, commit on a branch named after the work and open a draft pull
 request with `gh pr create --draft`, following the PR template. Keep the body short: two sentences under **What
 and why**, the commands under **How it was tested**, and as the Decisions section exactly what
 `bridge_pr_summary` returns, nothing more: it brings its own heading, so do not add one above it.
