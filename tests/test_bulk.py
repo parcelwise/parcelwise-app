@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -7,12 +8,14 @@ from app.labels import carriers
 from app.labels.bulk import (
     MAX_ORDERS,
     AllowanceExceeded,
+    BulkAlreadyRunning,
     BulkLine,
     BulkTooLarge,
     CarrierNotSupported,
     buy_labels,
     check_allowance,
     idempotency_key,
+    one_bulk_buy_per_merchant,
     quote_batch,
     total_price,
 )
@@ -48,6 +51,7 @@ def test_one_purchase_per_order_with_its_own_key(fake):
         batch_id="b1",
         plan="growth",
         used_this_month=0,
+        merchant_lock=nullcontext(),
         sleep=no_wait,
         live_label=no_label,
     )
@@ -63,6 +67,7 @@ def test_order_with_a_live_label_is_reprinted_not_bought_again(fake):
         batch_id="b1",
         plan="growth",
         used_this_month=0,
+        merchant_lock=nullcontext(),
         sleep=no_wait,
         live_label=lambda order: existing if order.id == "o2" else None,
     )
@@ -87,6 +92,7 @@ def test_batch_over_the_limit_buys_nothing(fake):
             batch_id="b1",
             plan="growth",
             used_this_month=0,
+            merchant_lock=nullcontext(),
             sleep=no_wait,
             live_label=no_label,
         )
@@ -116,6 +122,7 @@ def test_stale_quote_is_skipped_with_a_reason_and_the_rest_still_buy(fake):
         batch_id="b1",
         plan="growth",
         used_this_month=0,
+        merchant_lock=nullcontext(),
         sleep=no_wait,
         live_label=no_label,
     )
@@ -128,7 +135,13 @@ def test_changed_price_is_skipped_not_bought(fake):
     line = _line("o1", "5.40")
     changed = BulkLine(line.order, line.rate, Decimal("4.99"))
     [outcome] = buy_labels(
-        [changed], batch_id="b1", plan="growth", used_this_month=0, sleep=no_wait, live_label=no_label
+        [changed],
+        batch_id="b1",
+        plan="growth",
+        used_this_month=0,
+        merchant_lock=nullcontext(),
+        sleep=no_wait,
+        live_label=no_label,
     )
     assert outcome.status == "stale"
     assert fake.bought == []
@@ -148,6 +161,7 @@ def test_carrier_failure_is_listed_and_the_rest_still_buy(monkeypatch):
         batch_id="b1",
         plan="growth",
         used_this_month=0,
+        merchant_lock=nullcontext(),
         sleep=no_wait,
         live_label=no_label,
     )
@@ -169,6 +183,7 @@ def test_purchases_are_paced_to_forty_a_minute(fake):
         batch_id="b1",
         plan="growth",
         used_this_month=0,
+        merchant_lock=nullcontext(),
         live_label=no_label,
         clock=lambda: now[0],
         sleep=sleep,
@@ -192,6 +207,7 @@ def test_ups_lines_are_refused_before_anything_is_bought(fake):
             batch_id="b1",
             plan="growth",
             used_this_month=0,
+            merchant_lock=nullcontext(),
             live_label=no_label,
             sleep=no_wait,
         )
@@ -215,7 +231,7 @@ def test_starter_already_past_allowance_pays_extra_on_every_label():
 
 def test_quote_within_allowance_or_unlimited_has_no_extra():
     lines = [_line("o1", "5.40"), _line("o2", "7.15")]
-    for plan, used in (("starter", 0), ("growth", 50_000), ("free", 0)):
+    for plan, used in (("starter", 0), ("growth", 50_000), ("free", 48)):
         quote = quote_batch(lines, plan=plan, used_this_month=used)
         assert quote.labels_past_allowance == 0
         assert quote.extra_charge == Decimal(0)
@@ -229,7 +245,70 @@ def test_free_plan_batch_past_allowance_buys_nothing(fake):
             batch_id="b1",
             plan="free",
             used_this_month=49,
+            merchant_lock=nullcontext(),
             live_label=no_label,
             sleep=no_wait,
         )
     assert fake.bought == []
+
+
+def test_free_plan_quote_past_allowance_is_refused_before_the_confirm_step():
+    with pytest.raises(AllowanceExceeded) as err:
+        quote_batch([_line("o1"), _line("o2")], plan="free", used_this_month=49)
+    assert err.value.remaining == 1
+
+
+class FakeLockConn:
+    """Stands in for Postgres advisory locks: one holder per key."""
+
+    def __init__(self):
+        self.held = set()
+
+    def execute(self, sql, params):
+        (key,) = params
+        if "pg_try_advisory_lock" in sql:
+            got = key not in self.held
+            self.held.add(key)
+            return FakeResult(got)
+        self.held.discard(key)
+        return FakeResult(True)
+
+
+class FakeResult:
+    def __init__(self, value):
+        self.value = value
+
+    def fetchone(self):
+        return (self.value,)
+
+
+def test_second_bulk_buy_for_the_same_merchant_is_refused_and_buys_nothing(fake):
+    conn = FakeLockConn()
+    with one_bulk_buy_per_merchant(conn, "m1"), pytest.raises(BulkAlreadyRunning):
+        buy_labels(
+            [_line("o1")],
+            batch_id="b2",
+            plan="growth",
+            used_this_month=0,
+            live_label=no_label,
+            merchant_lock=one_bulk_buy_per_merchant(conn, "m1"),
+            sleep=no_wait,
+        )
+    assert fake.bought == []
+
+
+def test_lock_is_released_after_a_bulk_buy_and_other_merchants_are_not_blocked(fake):
+    conn = FakeLockConn()
+    with one_bulk_buy_per_merchant(conn, "m1"), one_bulk_buy_per_merchant(conn, "m2"):
+        pass
+    buy_labels(
+        [_line("o1")],
+        batch_id="b1",
+        plan="growth",
+        used_this_month=0,
+        live_label=no_label,
+        merchant_lock=one_bulk_buy_per_merchant(conn, "m1"),
+        sleep=no_wait,
+    )
+    assert conn.held == set()
+    assert fake.bought == ["bulk:b1:o1"]
