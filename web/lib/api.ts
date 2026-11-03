@@ -29,11 +29,18 @@ export const buyLabel = (orderId: string, rateId: string, shownPrice: string) =>
 
 export type BulkLineInput = { orderId: string; rateId: string; shownPrice: string };
 
-export type BulkQuote = { carrierTotal: string; labelsPastAllowance: number; extraCharge: string; total: string };
+// `skipped` lists orders on a carrier bulk buy doesn't cover yet; they are not bought or charged (Raven af045e508e3d).
+export type BulkQuote = {
+  carrierTotal: string;
+  labelsPastAllowance: number;
+  extraCharge: string;
+  total: string;
+  skipped: string[];
+};
 
 export type BulkOutcome = {
   orderId: string;
-  status: "bought" | "reprint" | "stale" | "failed";
+  status: "bought" | "reprint" | "stale" | "failed" | "skipped";
   label: Label | null;
   reason: string;
 };

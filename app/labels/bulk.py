@@ -45,10 +45,6 @@ class BulkTooLarge(Exception):
     pass
 
 
-class CarrierNotSupported(Exception):
-    """A line uses a carrier bulk buy doesn't cover yet. Nothing was bought."""
-
-
 class AllowanceExceeded(Exception):
     """The batch would pass a plan's allowance on a plan that stops there. Nothing was bought."""
 
@@ -71,11 +67,13 @@ def check_allowance(plan: str, used_this_month: int, count: int) -> None:
         raise AllowanceExceeded(remaining)
 
 
-def check_carriers(lines: list[BulkLine]) -> None:
-    """Refuse a selection with any carrier bulk buy doesn't cover yet. Nothing is bought."""
-    other = sorted({line.rate.carrier for line in lines} - BULK_CARRIERS)
-    if other:
-        raise CarrierNotSupported(f"bulk buy covers {', '.join(sorted(BULK_CARRIERS))} only, not {', '.join(other)}")
+# Orders on a carrier bulk buy doesn't cover are skipped with this reason and the rest are bought (Raven decision
+# af045e508e3d, Jordan Okafor).
+NOT_COVERED_REASON = "bulk buy covers USPS only for now; buy this label from the order's row"
+
+
+def covered(line: BulkLine) -> bool:
+    return line.rate.carrier in BULK_CARRIERS
 
 
 def idempotency_key(batch_id: str, order_id: str) -> str:
@@ -96,6 +94,7 @@ class BulkQuote:
     labels_past_allowance: int
     extra_charge: Decimal
     total: Decimal
+    skipped: list[str]  # order ids on a carrier bulk buy doesn't cover; they are listed, not bought or charged
 
 
 def quote_batch(lines: list[BulkLine], *, plan: str, used_this_month: int) -> BulkQuote:
@@ -104,14 +103,16 @@ def quote_batch(lines: list[BulkLine], *, plan: str, used_this_month: int) -> Bu
     da4c0386cf19, Priya Shah). The charge itself still posts through the nightly job (ADR 0006).
     """
     check_batch(lines, plan=plan, used_this_month=used_this_month)  # refused here too, before the confirm step
-    carrier_total = total_price(lines)
+    buying = [line for line in lines if covered(line)]
+    skipped = [line.order.id for line in lines if not covered(line)]
+    carrier_total = total_price(buying)
     allowance = monthly_allowance(plan)
     extra_price = PLANS[plan]["extra_label_price"]
     past = 0
     if allowance is not None and extra_price is not None:
-        past = min(len(lines), max(0, used_this_month + len(lines) - allowance))
+        past = min(len(buying), max(0, used_this_month + len(buying) - allowance))
     extra_charge = (extra_price or Decimal(0)) * past
-    return BulkQuote(carrier_total, past, extra_charge, carrier_total + extra_charge)
+    return BulkQuote(carrier_total, past, extra_charge, carrier_total + extra_charge, skipped)
 
 
 def _buy_one(line: BulkLine, batch_id: str) -> BulkOutcome:
@@ -138,8 +139,7 @@ def check_batch(lines: list[BulkLine], *, plan: str, used_this_month: int) -> No
     """Everything that refuses a whole batch before anything is bought."""
     if len(lines) > MAX_ORDERS:
         raise BulkTooLarge(f"{len(lines)} orders; at most {MAX_ORDERS} per bulk buy")
-    check_carriers(lines)
-    check_allowance(plan, used_this_month, len(lines))
+    check_allowance(plan, used_this_month, sum(1 for line in lines if covered(line)))
 
 
 def buy_labels(
@@ -167,6 +167,9 @@ def _buy_in_order(lines, batch_id, live_label, clock, sleep) -> list[BulkOutcome
     outcomes = []
     last_call = None
     for line in lines:
+        if not covered(line):
+            outcomes.append(BulkOutcome(line.order.id, "skipped", None, NOT_COVERED_REASON))
+            continue
         # An order with a label that hasn't been voided gets that label reprinted, never a second one (Raven
         # decision 28805ba43290, Jordan Okafor, rule from 27fca17c0708): USPS won't refund a double charge.
         existing = live_label(line.order)

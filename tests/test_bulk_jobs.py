@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from app.labels import carriers
-from app.labels.bulk import AllowanceExceeded, BulkTooLarge, CarrierNotSupported
+from app.labels.bulk import AllowanceExceeded, BulkTooLarge
 from app.labels.bulk_jobs import (
     BulkAlreadyRunning,
     JobDeps,
@@ -132,11 +132,17 @@ def test_batches_that_will_be_refused_are_refused_before_they_are_queued():
     db = FakeJobsDb()
     with pytest.raises(BulkTooLarge):
         start_bulk_buy(db, "m1", "b1", [_line(f"o{i}") for i in range(201)], plan="growth", used_this_month=0)
-    with pytest.raises(CarrierNotSupported):
-        start_bulk_buy(db, "m1", "b1", [_line("o1"), _line("o2", carrier="ups")], plan="growth", used_this_month=0)
     with pytest.raises(AllowanceExceeded):
         start_bulk_buy(db, "m1", "b1", [_line("o1"), _line("o2")], plan="free", used_this_month=49)
     assert db.jobs == {}
+
+
+def test_ups_orders_are_queued_and_then_skipped_with_a_reason(fake):
+    db = FakeJobsDb()
+    start_bulk_buy(db, "m1", "b1", [_line("o1"), _line("o2", carrier="ups")], plan="growth", used_this_month=0)
+    run_next_job(db, deps())
+    assert [o["status"] for o in get_job(db, "m1", "b1")["outcomes"]] == ["bought", "skipped"]
+    assert fake.bought == ["bulk:b1:o1"]
 
 
 def test_the_worker_buys_each_order_with_the_batch_id_in_its_key_and_records_outcomes(fake):

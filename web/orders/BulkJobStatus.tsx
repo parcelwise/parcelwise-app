@@ -8,6 +8,7 @@ const STATUS_TEXT: Record<BulkOutcome["status"], string> = {
   reprint: "Already has a label",
   stale: "Not bought",
   failed: "Not bought",
+  skipped: "Skipped",
 };
 
 // A bulk buy runs in the background, so the merchant can leave and come back to the results (Raven decision

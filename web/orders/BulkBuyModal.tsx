@@ -30,8 +30,7 @@ export function BulkBuyModal({
       const input: BulkLineInput[] = lines.map((l) => ({ orderId: l.order.id, rateId: l.rateId, shownPrice: l.price }));
       setJobId((await buyLabelsBulk(batchId, input)).id);
     } catch (e) {
-      // e.g. too many orders, a carrier bulk buy doesn't cover yet, past a Free plan's allowance, or a bulk buy is
-      // already running; nothing was bought.
+      // e.g. too many orders, past a Free plan's allowance, or a bulk buy is already running; nothing was bought.
       setError(String(e));
     } finally {
       setBusy(false);
@@ -48,12 +47,16 @@ export function BulkBuyModal({
     );
   }
 
+  // Orders on a carrier bulk buy doesn't cover yet are skipped and named, and the rest are bought (Raven decision
+  // af045e508e3d, Jordan Okafor).
+  const skipped = new Set(quote.skipped);
+  const buying = lines.filter((l) => !skipped.has(l.order.id));
   return (
     <div role="dialog" className="modal">
-      <h2>Buy {lines.length} labels</h2>
+      <h2>Buy {buying.length} labels</h2>
       <table>
         <tbody>
-          {lines.map((l) => (
+          {buying.map((l) => (
             <tr key={l.order.id}>
               <td>#{l.order.shopifyId}</td>
               <td>
@@ -72,9 +75,19 @@ export function BulkBuyModal({
           extra on your next invoice.
         </p>
       )}
+      {skipped.size > 0 && (
+        <p>
+          Skipping {skipped.size} non-USPS {skipped.size === 1 ? "order" : "orders"}: bulk buy covers USPS only for now. Buy
+          {skipped.size === 1 ? " its label" : " their labels"} from the order&apos;s row:{" "}
+          {lines
+            .filter((l) => skipped.has(l.order.id))
+            .map((l) => `#${l.order.shopifyId}`)
+            .join(", ")}
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
-      <button disabled={busy} onClick={confirm}>
-        Buy {lines.length} labels for <Price value={quote.total} />
+      <button disabled={busy || buying.length === 0} onClick={confirm}>
+        Buy {buying.length} labels for <Price value={quote.total} />
       </button>
     </div>
   );

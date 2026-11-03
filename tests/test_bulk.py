@@ -9,9 +9,9 @@ from app.labels.bulk import (
     AllowanceExceeded,
     BulkLine,
     BulkTooLarge,
-    CarrierNotSupported,
     buy_labels,
     check_allowance,
+    check_batch,
     idempotency_key,
     quote_batch,
     total_price,
@@ -189,24 +189,34 @@ def test_limits_are_carrier_ops_numbers():
     assert bulk.PURCHASES_PER_MINUTE == 40
 
 
-def test_ups_lines_are_refused_before_anything_is_bought(fake):
-    ups = Rate("ups", "ground", Decimal("7.00"), datetime.now(UTC), "rate_ups")
-    with pytest.raises(CarrierNotSupported):
-        buy_labels(
-            [_line("o1"), BulkLine(FakeOrder("o2"), ups, Decimal("7.00"))],
-            batch_id="b1",
-            plan="growth",
-            used_this_month=0,
-            live_label=no_label,
-            sleep=no_wait,
-        )
-    assert fake.bought == []
+def _ups(order_id):
+    return BulkLine(
+        FakeOrder(order_id), Rate("ups", "ground", Decimal("7.00"), datetime.now(UTC), "rate_ups"), Decimal("7.00")
+    )
 
 
-def test_ups_lines_are_refused_at_the_quote_step():
-    ups = Rate("ups", "ground", Decimal("7.00"), datetime.now(UTC), "rate_ups")
-    with pytest.raises(CarrierNotSupported):
-        quote_batch([_line("o1"), BulkLine(FakeOrder("o2"), ups, Decimal("7.00"))], plan="growth", used_this_month=0)
+def test_ups_orders_are_skipped_with_a_reason_and_the_usps_ones_bought(fake):
+    outcomes = buy_labels(
+        [_line("o1"), _ups("o2"), _line("o3")],
+        batch_id="b1",
+        plan="growth",
+        used_this_month=0,
+        live_label=no_label,
+        sleep=no_wait,
+    )
+    assert [o.status for o in outcomes] == ["bought", "skipped", "bought"]
+    assert "USPS only" in outcomes[1].reason
+    assert sorted(fake.bought) == ["bulk:b1:o1", "bulk:b1:o3"]
+
+
+def test_quote_lists_ups_orders_as_skipped_and_leaves_them_out_of_the_total():
+    quote = quote_batch([_line("o1", "5.40"), _ups("o2")], plan="growth", used_this_month=0)
+    assert quote.skipped == ["o2"]
+    assert quote.total == Decimal("5.40")
+
+
+def test_skipped_ups_orders_do_not_count_against_a_free_allowance():
+    check_batch([_line("o1"), _ups("o2")], plan="free", used_this_month=49)
 
 
 def test_starter_quote_shows_labels_past_allowance_and_extra_charge():
