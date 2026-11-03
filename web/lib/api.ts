@@ -28,3 +28,16 @@ export const buyLabel = (orderId: string, rateId: string, shownPrice: string) =>
   });
 
 export const searchOrders = (q: string) => call<Order[]>(`/orders/search?q=${encodeURIComponent(q)}`);
+
+export type BulkResult = { orderId: string; status: "bought" | "skipped" | "failed"; label?: Label; reason?: string };
+
+// One entry per order the merchant approved: the rate they were shown and its price.
+export const buyLabelsBulk = (items: { orderId: string; rateId: string; shownPrice: string }[]) =>
+  call<BulkResult[]>("/orders/labels/bulk", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ items: items.map((i) => ({ order_id: i.orderId, rate_id: i.rateId, shown_price: i.shownPrice })) }),
+  });
+
+// "Select all N matching": the total and the ids of the first 200 (the most one bulk action may take).
+export const matchingOrders = () => call<{ total: number; ids: string[] }>("/orders/matching");
